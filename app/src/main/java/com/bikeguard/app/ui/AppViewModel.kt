@@ -70,7 +70,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (on) app.tryStartTracking() else TrackingService.stop(app)
     }
 
-    fun setMode(m: String) {
+    fun updateMode(m: String) {
         mode = m
         app.prefs.mode = m
         if (m == MODE_ALWAYS) app.tryStartTracking()
