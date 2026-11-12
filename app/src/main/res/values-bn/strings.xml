@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BikeGuard</string>
+    <string name="channel_tracking">লাইভ ট্র্যাকিং</string>
+    <string name="channel_alerts">সতর্কতা</string>
+    <string name="notif_tracking_title">BikeGuard এই ফোন ট্র্যাক করছে</string>
+    <string name="notif_tracking_text">লোকেশন রেকর্ড ও সিঙ্ক হচ্ছে</string>
+    <string name="notif_resume_title">ট্র্যাকিং বন্ধ হয়ে গেছে</string>
+    <string name="notif_resume_text">আবার চালু করতে ট্যাপ করুন</string>
+
+    <string name="auth_title_in">স্বাগতম</string>
+    <string name="auth_title_up">অ্যাকাউন্ট খুলুন</string>
+    <string name="auth_subtitle">আপনার বাইক, সবসময় আপনার নাগালে।</string>
+    <string name="email">ইমেইল</string>
+    <string name="password">পাসওয়ার্ড</string>
+    <string name="password_hint">কমপক্ষে ৬ অক্ষর</string>
+    <string name="sign_in">সাইন ইন</string>
+    <string name="sign_up">অ্যাকাউন্ট খুলুন</string>
+    <string name="switch_to_up">নতুন? অ্যাকাউন্ট খুলুন</string>
+    <string name="switch_to_in">অ্যাকাউন্ট আছে? সাইন ইন করুন</string>
+    <string name="confirm_email">ইমেইল চেক করে অ্যাকাউন্ট নিশ্চিত করুন, তারপর সাইন ইন করুন।</string>
+    <string name="config_missing">Supabase কনফিগার করা নেই। SUPABASE_URL ও SUPABASE_ANON_KEY যোগ করে আবার বিল্ড করুন।</string>
+
+    <string name="tab_tracker">ট্র্যাকার</string>
+    <string name="tab_viewer">ভিউয়ার</string>
+    <string name="tab_settings">সেটিংস</string>
+
+    <string name="ring_tracking">ট্র্যাকিং চলছে</string>
+    <string name="ring_start">শুরু করতে ট্যাপ করুন</string>
+    <string name="ring_always">সবসময় চালু</string>
+    <string name="state_live">লাইভ ও সিঙ্ক হয়েছে</string>
+    <string name="state_offline">অফলাইন — ফোনে জমা হচ্ছে</string>
+    <string name="state_stopped">ট্র্যাকিং বন্ধ</string>
+    <string name="always_hint">সবসময়-চালু মোডে ট্র্যাকিং চলতেই থাকে। সেটিংস থেকে বদলান।</string>
+
+    <string name="stat_last_fix">শেষ লোকেশন</string>
+    <string name="stat_speed">গতি</string>
+    <string name="stat_accuracy">সঠিকতা</string>
+    <string name="stat_queued">আপলোডের অপেক্ষায়</string>
+    <string name="stat_battery">ব্যাটারি</string>
+    <string name="stat_updated">আপডেট</string>
+    <string name="none">—</string>
+    <string name="unit_kmh">%1$d কি.মি/ঘণ্টা</string>
+    <string name="unit_m">±%1$d মি.</string>
+    <string name="unit_points">%1$d টি পয়েন্ট</string>
+    <string name="ago_now">এইমাত্র</string>
+    <string name="ago_s">%1$d সেকেন্ড আগে</string>
+    <string name="ago_m">%1$d মিনিট আগে</string>
+    <string name="ago_h">%1$d ঘণ্টা আগে</string>
+
+    <string name="perm_step">ধাপ %1$d / %2$d</string>
+    <string name="perm_notif_title">নোটিফিকেশন চালু করুন</string>
+    <string name="perm_notif_body">ব্যাকগ্রাউন্ডে ট্র্যাকিং চলার সময় Android একটি নোটিফিকেশন দেখায়।</string>
+    <string name="perm_loc_title">লোকেশনের অনুমতি দিন</string>
+    <string name="perm_loc_body">বাইক অনুসরণ করতে BikeGuard-এর সঠিক GPS লোকেশন দরকার।</string>
+    <string name="perm_bg_title">সবসময় লোকেশনের অনুমতি দিন</string>
+    <string name="perm_bg_body">“সবসময় অনুমতি দিন” বেছে নিন, যাতে স্ক্রিন বন্ধ থাকলেও ট্র্যাকিং চলে।</string>
+    <string name="grant">অনুমতি দিন</string>
+    <string name="battery_title">Android যেন ট্র্যাকার বন্ধ না করে</string>
+    <string name="battery_body">ব্যাটারি অপটিমাইজেশন বন্ধ করুন। Xiaomi, Oppo, Vivo ও Samsung ফোনে Autostart বা Unrestricted battery-ও চালু করুন।</string>
+    <string name="open_settings">সেটিংস খুলুন</string>
+
+    <string name="viewer_no_device_title">এখনও কোনো ট্র্যাকার নেই</string>
+    <string name="viewer_no_device_body">বাইকের ফোনে একই অ্যাকাউন্টে সাইন ইন করে সেখানে ট্র্যাকিং চালু করুন।</string>
+    <string name="viewer_waiting">প্রথম লোকেশনের অপেক্ষায়…</string>
+    <string name="status_live">লাইভ</string>
+    <string name="status_delayed">বিলম্বিত</string>
+    <string name="status_offline">অফলাইন</string>
+    <string name="navigate">নেভিগেট</string>
+    <string name="connection_issue">সংযোগ সমস্যা — আবার চেষ্টা চলছে</string>
+    <string name="recenter">বাইক অনুসরণ</string>
+
+    <string name="set_mode">ট্র্যাকিং মোড</string>
+    <string name="mode_manual">ম্যানুয়াল</string>
+    <string name="mode_always">সবসময় চালু</string>
+    <string name="mode_hint">সবসময় চালু মোড রিবুটের পর শুরু হয় এবং Android বন্ধ করলে আবার চালু হয়। মোশন-ভিত্তিক Auto মোড আসছে Phase 2-তে।</string>
+    <string name="set_interval">আপডেটের ব্যবধান</string>
+    <string name="interval_s">%1$d সে.</string>
+    <string name="set_device">এই ফোন</string>
+    <string name="set_account">অ্যাকাউন্ট</string>
+    <string name="sign_out">সাইন আউট</string>
+    <string name="version">সংস্করণ %1$s</string>
+</resources>
