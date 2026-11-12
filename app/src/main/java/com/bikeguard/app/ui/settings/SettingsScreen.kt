@@ -42,7 +42,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 modes.forEachIndexed { i, (value, label) ->
                     SegmentedButton(
-                        selected = vm.mode == value, onClick = { vm.setMode(value) },
+                        selected = vm.mode == value, onClick = { vm.updateMode(value) },
                         shape = SegmentedButtonDefaults.itemShape(i, modes.size), colors = segColors,
                     ) { Text(stringResource(label)) }
                 }
