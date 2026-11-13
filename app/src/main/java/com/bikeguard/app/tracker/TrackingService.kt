@@ -20,10 +20,16 @@ import com.bikeguard.app.BikeGuardApp
 import com.bikeguard.app.MainActivity
 import com.bikeguard.app.R
 import com.bikeguard.app.data.CommandDto
+import com.bikeguard.app.data.DeviceSettingsDto
+import com.bikeguard.app.data.MODE_ALWAYS
 import com.bikeguard.app.data.MODE_AUTO
 import com.bikeguard.app.data.PendingLocation
 import com.bikeguard.app.data.Perms
 import com.bikeguard.app.data.isoToMs
+import com.bikeguard.app.tracker.AutoMode
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import java.time.LocalTime
 import com.bikeguard.app.widget.TrackerWidget
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -62,6 +68,7 @@ class TrackingService : Service() {
     private var lastCharging: Boolean? = null
     private var lastStationaryFor = 0L
     private var lastWidgetAt = 0L
+    private var lastSettingsSeenMs = 0L
 
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -87,6 +94,13 @@ class TrackingService : Service() {
             while (isActive) {
                 try { runCommands() } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e }
                 withTimeoutOrNull(15_000) { pollSignal.receive() }
+            }
+        }
+        // Server-synced settings + health watch: every 30 s (tracker role only).
+        scope.launch {
+            while (isActive) {
+                try { syncSettings() } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e }
+                delay(30_000)
             }
         }
     }
@@ -230,13 +244,103 @@ class TrackingService : Service() {
             "live" -> { guard.goLive(15); reevaluateInterval() }
             "siren_on" -> SirenPlayer.start(this, 60)
             "siren_off" -> SirenPlayer.stop(this)
-            "arm" -> GuardControl.setArmed(this, true)
-            "disarm" -> { GuardControl.setArmed(this, false); SirenPlayer.stop(this) }
-            "set_speed_limit" -> { app.prefs.speedLimitKmh = c.arg?.toIntOrNull() ?: 0; app.prefs.stateDirty = true }
+            "arm" -> { GuardControl.setArmed(this, true); pushSettingsToServer() }
+            "disarm" -> { GuardControl.setArmed(this, false); SirenPlayer.stop(this); pushSettingsToServer() }
+            "set_speed_limit" -> { app.prefs.speedLimitKmh = c.arg?.toIntOrNull() ?: 0; app.prefs.stateDirty = true; pushSettingsToServer() }
             "cancel_sos" -> SosController.cancel(this)
             "mark_serviced" -> app.prefs.markServiced()
         }
         flushSignal.trySend(Unit)
+    }
+
+    // ---------- server-synced settings (v1.1.0) ----------
+
+    /** Pulls the Remote phone's settings row and applies it, then confirms with applied_at. */
+    private suspend fun syncSettings() {
+        checkHealth()
+        checkGuardSchedule()
+        val p = app.prefs
+        if (!p.isLoggedIn || p.isRemote) return
+        val s = try { app.api.getDeviceSettings(p.deviceId) } catch (e: IOException) { null } ?: return
+        val updatedMs = isoToMs(s.updatedAt.orEmpty())
+        if (updatedMs <= lastSettingsSeenMs && updatedMs != 0L) return
+        if (updatedMs > 0L) lastSettingsSeenMs = updatedMs
+        applySettings(s)
+        try { app.api.markSettingsApplied(p.deviceId) } catch (e: IOException) { /* retried next poll */ }
+    }
+
+    private fun applySettings(s: DeviceSettingsDto) {
+        val p = app.prefs
+        if (s.mode in listOf("manual", "auto", "always") && s.mode != p.mode) {
+            p.mode = s.mode
+            if (s.mode == MODE_AUTO) AutoMode.enable(app) else AutoMode.disable(app)
+            if (s.mode == MODE_ALWAYS) tryStartTracking()
+            else p.trackingActive = TrackerState.running.value
+        }
+        if (s.intervalSec in 3..60 && s.intervalSec != p.intervalSec) {
+            p.intervalSec = s.intervalSec
+            reevaluateInterval()
+        }
+        if (s.speedLimitKmh != p.speedLimitKmh) { p.speedLimitKmh = s.speedLimitKmh; p.stateDirty = true }
+        if (s.guardArmed != p.parkingArmed) GuardControl.setArmed(this, s.guardArmed)
+        if (s.crashEnabled != p.crashDetection) p.crashDetection = s.crashEnabled
+        if (s.sosNumber != p.emergencyNumber) p.emergencyNumber = s.sosNumber
+        if (s.serviceKm != p.serviceIntervalKm) p.scheduleService(s.serviceKm)
+        p.guardScheduleStart = s.guardScheduleStart ?: -1
+        p.guardScheduleEnd = s.guardScheduleEnd ?: -1
+    }
+
+    /** Mirrors this phone's state back to the server after a remote command, without bumping updated_at. */
+    private fun pushSettingsToServer() {
+        val p = app.prefs
+        scope.launch {
+            // No settings row seen from the server yet: there is nothing to mirror, and an
+            // explicit-null schedule here would wipe a schedule the Remote phone set.
+            if (lastSettingsSeenMs == 0L) {
+                runCatching { app.api.markSettingsApplied(p.deviceId) }
+                return@launch
+            }
+            val dto = DeviceSettingsDto(
+                deviceId = p.deviceId, mode = p.mode, intervalSec = p.intervalSec,
+                speedLimitKmh = p.speedLimitKmh, guardArmed = p.parkingArmed,
+                crashEnabled = p.crashDetection, sosNumber = p.emergencyNumber,
+                serviceKm = p.serviceIntervalKm,
+                guardScheduleStart = p.guardScheduleStart.takeIf { it in 0..23 },
+                guardScheduleEnd = p.guardScheduleEnd.takeIf { it in 0..23 },
+            )
+            try {
+                if (app.api.saveDeviceSettings(dto, touchUpdated = false)) {
+                    app.api.markSettingsApplied(p.deviceId)
+                }
+            } catch (e: IOException) { /* retried on the next settings poll */ }
+        }
+    }
+
+    /** Guard schedule: arm inside the window, disarm when it ends (only if the schedule armed it). */
+    private fun checkGuardSchedule() {
+        val p = app.prefs
+        val start = p.guardScheduleStart
+        val end = p.guardScheduleEnd
+        if (start !in 0..23 || end !in 0..23 || start == end) return
+        val hour = LocalTime.now().hour
+        val inside = if (start < end) hour in start until end else hour >= start || hour < end
+        if (inside && !p.parkingArmed) { GuardControl.setArmed(this, true); p.scheduleArmed = true }
+        else if (!inside && p.scheduleArmed) { GuardControl.setArmed(this, false); p.scheduleArmed = false }
+    }
+
+    /** Raises one health_warning event when the tracker's health changes for the worse. */
+    private fun checkHealth() {
+        val fine = Perms.hasFine(this)
+        val battOk = Perms.ignoringBatteryOptimizations(this)
+        val key = "fine=$fine|batt=$battOk"
+        if (key == app.prefs.lastHealthState) return
+        app.prefs.lastHealthState = key
+        if (!fine || !battOk) {
+            GuardControl.raise(
+                this, "health_warning", "warning",
+                buildJsonObject { put("location", fine); put("battery_ok", battOk) },
+            )
+        }
     }
 
     @SuppressLint("MissingPermission")

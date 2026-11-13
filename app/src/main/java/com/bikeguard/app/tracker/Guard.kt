@@ -100,7 +100,11 @@ class Guard(private val ctx: Context, private val app: BikeGuardApp) : SensorGua
         checkServiceDue()
 
         // parking mode: remember where the bike was parked, alert when it leaves
-        if (armed && !armedSeen) { anchor = loc; armedSeen = true }
+        if (armed && !armedSeen) {
+            anchor = loc; armedSeen = true
+            // Save the spot so the Remote phone can show "where I parked".
+            app.appScope.launch { runCatching { app.api.saveParkingSpot(app.prefs.deviceId, loc.latitude, loc.longitude) } }
+        }
         if (!armed && armedSeen) { armedSeen = false; anchor = null }
         if (armed) {
             anchor?.let { a ->

@@ -23,6 +23,7 @@ fun eventTitle(ctx: Context, type: String, dataJson: String?): String {
         "sos" -> ctx.getString(R.string.ev_sos)
         "service_due" -> ctx.getString(R.string.ev_service_due)
         "device_stale" -> ctx.getString(R.string.ev_device_stale)
+        "health_warning" -> ctx.getString(R.string.ev_health_warning)
         else -> ctx.getString(R.string.ev_unknown)
     }
 }

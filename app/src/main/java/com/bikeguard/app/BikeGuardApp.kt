@@ -39,7 +39,7 @@ class BikeGuardApp : Application() {
         realtime = RealtimeClient(api)
         TrackerState.armed.value = prefs.parkingArmed
         createChannels()
-        if (prefs.isLoggedIn && prefs.mode == MODE_AUTO) AutoMode.enable(this)
+        if (prefs.isLoggedIn && prefs.mode == MODE_AUTO && !prefs.isRemote) AutoMode.enable(this)
         // Watchdog: every ~15 min flush the queue and make sure tracking is still alive.
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             "watchdog", ExistingPeriodicWorkPolicy.KEEP,

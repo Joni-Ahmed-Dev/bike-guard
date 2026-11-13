@@ -131,3 +131,40 @@ data class ShareLinkDto(
 
 @Serializable
 data class PushTokenDto(val token: String, @SerialName("device_id") val deviceId: String)
+
+/** One row per tracker device: the settings the Remote phone edits and the tracker applies. */
+@Serializable
+data class DeviceSettingsDto(
+    @SerialName("device_id") val deviceId: String,
+    val mode: String = "manual",
+    @SerialName("interval_sec") val intervalSec: Int = 5,
+    @SerialName("speed_limit_kmh") val speedLimitKmh: Int = 0,
+    @SerialName("guard_armed") val guardArmed: Boolean = false,
+    @SerialName("crash_enabled") val crashEnabled: Boolean = true,
+    @SerialName("sos_number") val sosNumber: String = "",
+    @SerialName("service_km") val serviceKm: Int = 0,
+    @SerialName("guard_schedule_start") val guardScheduleStart: Int? = null,
+    @SerialName("guard_schedule_end") val guardScheduleEnd: Int? = null,
+    @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("applied_at") val appliedAt: String? = null,
+)
+
+@Serializable
+data class FamilyInviteDto(
+    val id: String? = null,
+    val code: String,
+    val role: String = "viewer",
+    @SerialName("used_by") val usedBy: String? = null,
+)
+
+@Serializable
+data class ParkingSpotDto(
+    val id: String? = null,
+    @SerialName("device_id") val deviceId: String,
+    val lat: Double,
+    val lng: Double,
+    val note: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+) {
+    val createdMs: Long get() = isoToMs(createdAt.orEmpty())
+}

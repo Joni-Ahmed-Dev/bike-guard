@@ -281,6 +281,90 @@ class SupabaseApi(private val prefs: Prefs) {
         }.ok
     }
 
+    // ---------- v1.1.0: server-synced settings, family invites, parking spots ----------
+
+    /** The Remote phone's edits for one tracker device, or null when no row exists yet. */
+    suspend fun getDeviceSettings(deviceId: String): DeviceSettingsDto? {
+        val r = authed {
+            builder("/rest/v1/device_settings?device_id=eq.$deviceId&select=*", it).get().build()
+        }
+        if (!r.ok) return null
+        return json.decodeFromString(ListSerializer(DeviceSettingsDto.serializer()), r.body).firstOrNull()
+    }
+
+    /**
+     * Upsert one settings row. [touchUpdated] is true for a Remote edit (marks it as new work for
+     * the tracker) and false when the tracker mirrors its own state back (keeps the old timestamp,
+     * so the Remote phone does not see its own change as "waiting" again).
+     */
+    suspend fun saveDeviceSettings(dto: DeviceSettingsDto, touchUpdated: Boolean = true): Boolean = try {
+        // Built by hand (not the serializer): clearing the schedule must send an explicit null,
+        // and the serializer would drop nulls, so merge-duplicates would keep the old value.
+        val payload = buildJsonObject {
+            put("device_id", dto.deviceId)
+            put("mode", dto.mode)
+            put("interval_sec", dto.intervalSec)
+            put("speed_limit_kmh", dto.speedLimitKmh)
+            put("guard_armed", dto.guardArmed)
+            put("crash_enabled", dto.crashEnabled)
+            put("sos_number", dto.sosNumber)
+            put("service_km", dto.serviceKm)
+            put("guard_schedule_start", dto.guardScheduleStart)
+            put("guard_schedule_end", dto.guardScheduleEnd)
+            if (touchUpdated) put("updated_at", java.time.Instant.now().toString())
+        }.toString()
+        authed {
+            builder("/rest/v1/device_settings?on_conflict=device_id", it)
+                .header("Prefer", "resolution=merge-duplicates,return=minimal")
+                .post(payload.toRequestBody(jsonType)).build()
+        }.ok
+    } catch (e: IOException) { false }
+
+    /** The tracker calls this after it has applied the Remote phone's settings. */
+    suspend fun markSettingsApplied(deviceId: String): Boolean = try {
+        val body = buildJsonObject { put("applied_at", java.time.Instant.now().toString()) }.toString()
+        authed {
+            builder("/rest/v1/device_settings?device_id=eq.$deviceId", it)
+                .header("Prefer", "return=minimal").patch(body.toRequestBody(jsonType)).build()
+        }.ok
+    } catch (e: IOException) { false }
+
+    suspend fun createFamilyInvite(code: String): Boolean = try {
+        val payload = json.encodeToString(FamilyInviteDto.serializer(), FamilyInviteDto(code = code))
+        authed {
+            builder("/rest/v1/family_invites", it).header("Prefer", "return=minimal")
+                .post(payload.toRequestBody(jsonType)).build()
+        }.ok
+    } catch (e: IOException) { false }
+
+    /** The tracker saves one row each time parking mode is armed, so the Remote phone can show it. */
+    suspend fun saveParkingSpot(deviceId: String, lat: Double, lng: Double): Boolean = try {
+        val payload = json.encodeToString(
+            ParkingSpotDto.serializer(), ParkingSpotDto(deviceId = deviceId, lat = lat, lng = lng)
+        )
+        authed {
+            builder("/rest/v1/parking_spots", it).header("Prefer", "return=minimal")
+                .post(payload.toRequestBody(jsonType)).build()
+        }.ok
+    } catch (e: IOException) { false }
+
+    suspend fun latestParkingSpot(deviceId: String): ParkingSpotDto? {
+        val r = authed {
+            builder("/rest/v1/parking_spots?device_id=eq.$deviceId&select=*&order=created_at.desc&limit=1", it).get().build()
+        }
+        if (!r.ok) return null
+        return json.decodeFromString(ListSerializer(ParkingSpotDto.serializer()), r.body).firstOrNull()
+    }
+
+    /** Updates the note on the newest parking spot for this device. */
+    suspend fun updateLatestParkingNote(deviceId: String, note: String): Boolean = try {
+        val body = buildJsonObject { put("note", note) }.toString()
+        authed {
+            builder("/rest/v1/parking_spots?device_id=eq.$deviceId&order=created_at.desc&limit=1", it)
+                .header("Prefer", "return=minimal").patch(body.toRequestBody(jsonType)).build()
+        }.ok
+    } catch (e: IOException) { false }
+
     // ---------- token for the Realtime websocket ----------
 
     /** A usable access token; refreshes first when the current one is about to expire. Null when signed out. */

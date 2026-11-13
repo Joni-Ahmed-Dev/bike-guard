@@ -55,6 +55,7 @@ fun ReplayScreen(modifier: Modifier, vm: TripsViewModel, trip: TripDto) {
 
     val nowMs = startMs + (progress * durationMs).toLong()
     val sample = remember(pts, progress) { if (ready) sampleAt(pts, times, nowMs) else null }
+    val score = remember(pts) { rideScore(pts) }
 
     Box(modifier.fillMaxSize()) {
         ReplayMap(Modifier.fillMaxSize(), pts, sample, follow, onUserGesture = { follow = false })
@@ -125,6 +126,15 @@ fun ReplayScreen(modifier: Modifier, vm: TripsViewModel, trip: TripDto) {
                     )
                     Text("80+ km/h", color = Palette.Muted, style = MaterialTheme.typography.labelMedium)
                 }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    stringResource(R.string.ride_score, score.score),
+                    style = MaterialTheme.typography.titleMedium, color = Palette.Ember,
+                )
+                Text(
+                    stringResource(R.string.ride_score_hint, score.harshBrakes, score.overSpeedPct),
+                    color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
+                )
             }
         }
     }

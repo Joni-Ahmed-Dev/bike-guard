@@ -27,6 +27,7 @@
   <div id="name"><span id="dev">BikeGuard</span><span id="status">…</span></div>
   <div id="speed">–<small>km/h</small></div>
   <div id="meta"><span id="upd"></span><span id="bat"></span><span id="exp"></span></div>
+  <div id="meta" style="margin-top:8px"><a id="dash" href="dashboard.html" style="color:#ff9f1c">Dashboard</a></div>
 </div>
 <script>
 const bn = (navigator.language || "").startsWith("bn");
@@ -35,6 +36,7 @@ const T = bn
   : { live:"Live", stale:"Delayed", gone:"This link has expired or was stopped", err:"Connection issue…", ago:"Updated", s:"s ago", m:"min ago", left:"expires in", min:"min" };
 const $ = (id) => document.getElementById(id);
 const token = location.hash.slice(1);
+$("dash").href = "dashboard.html#" + token;
 
 async function rpc(fn) {
   const r = await fetch(`${BG.url}/rest/v1/rpc/${fn}`, {

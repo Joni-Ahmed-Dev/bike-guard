@@ -39,3 +39,45 @@ fun speedColor(kmh: Float): Int =
     else ColorUtils.blendARGB(MID, HIGH, ((kmh - 40f) / 40f).coerceIn(0f, 1f))
 
 fun colorHex(c: Int): String = String.format("#%06X", 0xFFFFFF and c)
+
+/** Points around a circle (closed ring, first point repeated at the end) for a geofence on the map. */
+fun circlePoints(lat: Double, lng: Double, radiusM: Int, steps: Int = 48): List<org.maplibre.android.geometry.LatLng> {
+    val earthR = 6_371_000.0
+    val latRad = Math.toRadians(lat)
+    val out = ArrayList<org.maplibre.android.geometry.LatLng>(steps + 1)
+    for (i in 0..steps) {
+        val brg = Math.toRadians(i * 360.0 / steps)
+        val pLat = Math.asin(
+            sin(latRad) * cos(radiusM / earthR) +
+                cos(latRad) * sin(radiusM / earthR) * cos(brg)
+        )
+        val pLng = Math.toRadians(lng) + atan2(
+            sin(brg) * sin(radiusM / earthR) * cos(latRad),
+            cos(radiusM / earthR) - sin(latRad) * sin(pLat),
+        )
+        out += org.maplibre.android.geometry.LatLng(Math.toDegrees(pLat), Math.toDegrees(pLng))
+    }
+    return out
+}
+
+data class RideScore(val score: Int, val harshBrakes: Int, val overSpeedPct: Int)
+
+/**
+ * 0-100 ride score from the trip's points: -15 per harsh brake (a drop of 20 km/h or more between
+ * fixes) and up to -30 for the share of the ride spent over 80 km/h. A short or gentle ride scores 100.
+ */
+fun rideScore(points: List<PointDto>): RideScore {
+    if (points.size < 5) return RideScore(100, 0, 0)
+    var harsh = 0
+    var over = 0
+    var prev = (points.first().speed ?: 0f) * 3.6f
+    for (p in points.drop(1)) {
+        val kmh = (p.speed ?: 0f) * 3.6f
+        if (prev - kmh >= 20f) harsh++
+        if (kmh > 80f) over++
+        prev = kmh
+    }
+    val overPct = (over * 100 / points.size).coerceIn(0, 100)
+    val score = (100 - harsh * 15 - overPct * 30 / 100).coerceIn(0, 100)
+    return RideScore(score, harsh, overPct)
+}

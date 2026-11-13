@@ -20,6 +20,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.bikeguard.app.data.GeofenceDto
+import com.bikeguard.app.ui.trips.circlePoints
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -29,6 +31,7 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory.*
@@ -38,6 +41,7 @@ import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
+import org.maplibre.geojson.Polygon
 
 /** OpenStreetMap data via OpenFreeMap (free, no API key). Other styles: liberty, dark, positron, fiord. */
 internal const val MAP_STYLE = "https://tiles.openfreemap.org/styles/bright"
@@ -54,6 +58,7 @@ fun BikeMap(
     follow: Boolean,
     attributionBottomDp: Int,
     onUserGesture: () -> Unit,
+    geofences: List<GeofenceDto> = emptyList(),
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -140,6 +145,16 @@ fun BikeMap(
         else src.setGeoJson(FeatureCollection.fromFeatures(emptyList<Feature>()))
     }
 
+    // Geofence circles, drawn from the server list.
+    LaunchedEffect(geofences, style) {
+        val src = style?.getSourceAs<GeoJsonSource>("geo-src") ?: return@LaunchedEffect
+        val features = geofences.filter { it.active }.map { g ->
+            val ring = circlePoints(g.lat, g.lng, g.radiusM).map { Point.fromLngLat(it.longitude, it.latitude) }
+            Feature.fromGeometry(Polygon.fromLngLats(listOf(ring)))
+        }
+        src.setGeoJson(FeatureCollection.fromFeatures(features))
+    }
+
     // Soft radar pulse around the bike. Read inside a snapshotFlow so the map does not recompose every frame.
     val pulse = rememberInfiniteTransition(label = "pulse")
         .animateFloat(14f, 32f, infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Restart), label = "r")
@@ -163,6 +178,15 @@ private fun addLayers(style: Style) {
     style.addImage("arrow", arrowBitmap())
     style.addSource(GeoJsonSource("trail-src"))
     style.addSource(GeoJsonSource("bike-src"))
+    style.addSource(GeoJsonSource("geo-src"))
+    style.addLayer(
+        FillLayer("geo-fill", "geo-src").withProperties(fillColor(EMBER), fillOpacity(0.12f))
+    )
+    style.addLayer(
+        LineLayer("geo-line", "geo-src").withProperties(
+            lineColor(EMBER), lineWidth(2f), lineOpacity(0.7f),
+        )
+    )
     style.addLayer(
         LineLayer("trail-layer", "trail-src").withProperties(
             lineColor(EMBER), lineWidth(4f), lineOpacity(0.85f),

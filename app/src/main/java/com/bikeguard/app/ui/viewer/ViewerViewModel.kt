@@ -54,7 +54,8 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
                     if (!devicesLoaded || n % 6 == 0) loadDevices()
                     selectedId?.let { refresh(it, full = n % 6 == 0 || trail.isEmpty()) }
                     n++
-                    delay(if (app.realtime.connected.value) 20_000 else 5_000)
+                    // Low-data mode: poll every 15 s instead of 5 s when the websocket is down.
+                    delay(if (app.realtime.connected.value) 20_000 else if (app.prefs.lowDataMode) 15_000 else 5_000)
                 }
             } finally {
                 rt.cancel()
@@ -80,6 +81,7 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
     fun select(id: String) {
         if (id == selectedId) return
         selectedId = id; latest = null; trail = emptyList(); loaded = false
+        app.prefs.remoteTargetDeviceId = id
         viewModelScope.launch { refresh(id, full = true) }
     }
 
@@ -92,6 +94,7 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
             devicesLoaded = true
             if (selectedId == null || list.none { it.id == selectedId }) {
                 selectedId = (list.firstOrNull { it.id != app.prefs.deviceId } ?: list.firstOrNull())?.id
+                selectedId?.let { app.prefs.remoteTargetDeviceId = it }
             }
         } catch (e: IOException) {
             connectionIssue = true

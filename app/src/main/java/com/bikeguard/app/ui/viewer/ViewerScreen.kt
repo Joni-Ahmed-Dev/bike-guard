@@ -52,18 +52,20 @@ private enum class Status(val label: Int, val color: Color) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel()) {
+fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(), readOnly: Boolean = false) {
     val ctx = LocalContext.current
     val owner = LocalLifecycleOwner.current
     LaunchedEffect(Unit) {
         owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { vm.pollLoop() }
     }
+    LaunchedEffect(Unit) { vm.loadGeofences() }
 
     val now = rememberNow()
     val latest = vm.latest
     val position = latest?.let { LatLng(it.lat, it.lng) }
     val trail = remember(vm.trail) { vm.trail.map { LatLng(it.lat, it.lng) } }
     var follow by remember { mutableStateOf(true) }
+    var offlineMsg by remember { mutableStateOf<Int?>(null) }
 
     val age = latest?.let { now - it.recordedAtMs }
     val status = when {
@@ -87,7 +89,7 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
             SheetContent(
                 ctx = ctx, now = now, latest = latest, status = status, deviceName = deviceName,
                 loading = !vm.loaded && vm.selectedId != null, noDevice = vm.devicesLoaded && vm.devices.isEmpty(),
-                vm = vm,
+                vm = vm, readOnly = readOnly,
             )
         },
     ) { _ ->
@@ -101,6 +103,7 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
                 follow = follow,
                 attributionBottomDp = PEEK.value.toInt() + 8,
                 onUserGesture = { follow = false },
+                geofences = vm.geofences,
             )
 
             Column(Modifier.align(Alignment.TopStart).statusBarsPadding().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -127,6 +130,23 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
                         )
                     }
                 }
+                if (latest != null) {
+                    FilterChip(
+                        selected = false,
+                        onClick = { OfflineMap.downloadAround(ctx, latest.lat, latest.lng) { offlineMsg = it } },
+                        label = { Text(stringResource(R.string.offline_map)) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = Palette.Surface.copy(alpha = 0.9f), labelColor = Palette.Text,
+                        ),
+                    )
+                    offlineMsg?.let {
+                        Text(
+                            stringResource(it), color = Palette.Text,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.background(Palette.Surface.copy(alpha = 0.9f), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 4.dp),
+                        )
+                    }
+                }
             }
 
             SmallFloatingActionButton(
@@ -141,7 +161,7 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
 @Composable
 private fun SheetContent(
     ctx: Context, now: Long, latest: LocationDto?, status: Status, deviceName: String, loading: Boolean, noDevice: Boolean,
-    vm: ViewerViewModel,
+    vm: ViewerViewModel, readOnly: Boolean = false,
 ) {
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
         when {
@@ -201,7 +221,8 @@ private fun SheetContent(
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                ViewerControls(vm)
+                if (!readOnly) ViewerControls(vm)
+                else Text(stringResource(R.string.invite_mode), color = Palette.Muted, style = MaterialTheme.typography.labelMedium)
             }
         }
     }

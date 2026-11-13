@@ -98,6 +98,13 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             Spacer(Modifier.width(8.dp))
             Text(stringResource(stateText), color = stateColor, style = MaterialTheme.typography.bodyMedium)
         }
+        if (ctx.bikeApp.prefs.isTracker) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.tracker_view_only), color = Palette.Muted,
+                style = MaterialTheme.typography.bodyMedium, modifier = Modifier.align(Alignment.Start),
+            )
+        }
 
         Spacer(Modifier.height(24.dp))
 

@@ -89,16 +89,43 @@ interface EventDao {
     suspend fun clear()
 }
 
-@Database(entities = [PendingLocation::class, PendingEvent::class], version = 2, exportSchema = false)
+/** One expense line (fuel, service, repair, other). Local copy; the server has the same table. */
+@Entity(tableName = "expenses")
+data class ExpenseRecord(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val category: String,
+    val amount: Double,
+    val note: String,
+    val spentOn: Long,
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+@Dao
+interface ExpenseDao {
+    @Insert
+    suspend fun insert(e: ExpenseRecord): Long
+
+    @Query("DELETE FROM expenses WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Query("SELECT * FROM expenses ORDER BY spentOn DESC, id DESC")
+    fun all(): Flow<List<ExpenseRecord>>
+
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE spentOn >= :fromMs")
+    fun totalSince(fromMs: Long): Flow<Double>
+}
+
+@Database(entities = [PendingLocation::class, PendingEvent::class, ExpenseRecord::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun pending(): PendingDao
     abstract fun events(): EventDao
+    abstract fun expenses(): ExpenseDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "bikeguard.db")
-                .fallbackToDestructiveMigration() // v1 -> v2: only an unsent queue is lost
+                .fallbackToDestructiveMigration() // v2 -> v3: the unsent queue and the local expense log are lost
                 .build().also { instance = it }
         }
     }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -20,10 +21,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.bikeguard.app.BuildConfig
 import com.bikeguard.app.R
@@ -49,19 +52,34 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     )
 
     // Local mirrors of the stored settings so the switches react instantly.
+    // Keyed on the server row: when it loads, the screen shows the server's values.
     var autoArm by remember { mutableStateOf(prefs.autoArm) }
     var siren by remember { mutableStateOf(prefs.sirenOnAlert) }
-    var crash by remember { mutableStateOf(prefs.crashDetection) }
+    var crash by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.crashEnabled ?: prefs.crashDetection) }
     var sms by remember { mutableStateOf(prefs.sosSms) }
-    var number by remember { mutableStateOf(prefs.emergencyNumber) }
-    var limit by remember { mutableIntStateOf(prefs.speedLimitKmh) }
-    var serviceEvery by remember { mutableIntStateOf(prefs.serviceIntervalKm) }
+    var number by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.sosNumber ?: prefs.emergencyNumber) }
+    var limit by remember(vm.remoteSettings) { mutableIntStateOf(vm.remoteSettings?.speedLimitKmh ?: prefs.speedLimitKmh) }
+    var serviceEvery by remember(vm.remoteSettings) { mutableIntStateOf(vm.remoteSettings?.serviceKm ?: prefs.serviceIntervalKm) }
     var odo by remember { mutableIntStateOf(prefs.odometerKm.toInt()) }
     var next by remember { mutableIntStateOf(prefs.nextServiceKm.toInt()) }
     var lock by remember { mutableStateOf(prefs.appLock) }
     var autoDenied by remember { mutableStateOf(false) }
     var smsDenied by remember { mutableStateOf(false) }
     var lockMsg by remember { mutableStateOf(false) }
+
+    val isTracker = prefs.isTracker
+    val isRemote = prefs.isRemote
+    var lowData by remember { mutableStateOf(prefs.lowDataMode) }
+    var schedStart by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.guardScheduleStart?.toString() ?: prefs.guardScheduleStart.takeIf { it in 0..23 }?.toString() ?: "") }
+    var schedEnd by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.guardScheduleEnd?.toString() ?: prefs.guardScheduleEnd.takeIf { it in 0..23 }?.toString() ?: "") }
+    var familyCode by remember { mutableStateOf<String?>(null) }
+    var inviteInput by remember { mutableStateOf(prefs.viewerInviteCode.orEmpty()) }
+    var inviteSaved by remember { mutableStateOf(false) }
+    var showPinDialog by remember { mutableStateOf(false) }
+    var pinInput by remember { mutableStateOf("") }
+    var pinWrong by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) { if (isRemote) vm.loadRemoteSettings() }
 
     val activityPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         autoDenied = !ok
@@ -82,6 +100,56 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     ) {
         Text(stringResource(R.string.tab_settings), style = MaterialTheme.typography.headlineMedium)
 
+        // ---- sync status (Remote only): did the bike phone apply the settings? ----
+        if (isRemote) {
+            Panel(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.settings_target, vm.settingsTargetId.take(8)),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            when (vm.settingsApplied) {
+                                true -> stringResource(R.string.sync_applied)
+                                false -> stringResource(R.string.sync_pending)
+                                null -> stringResource(R.string.none)
+                            },
+                            color = if (vm.settingsApplied == true) Palette.Signal else Palette.Muted,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        vm.settingsNote?.let {
+                            Text(it, color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    OutlinedButton(onClick = vm::loadRemoteSettings) { Text(stringResource(R.string.sync_refresh)) }
+                }
+            }
+        }
+
+        // ---- tracker role: settings are view-only ----
+        if (isTracker) {
+            Panel(Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.tracker_view_only), color = Palette.Ember, style = MaterialTheme.typography.bodyMedium)
+            }
+            Panel(Modifier.fillMaxWidth()) {
+                ReadOnlyRow(stringResource(R.string.set_mode), stringResource(when (vm.mode) {
+                    MODE_MANUAL -> R.string.mode_manual
+                    MODE_AUTO -> R.string.mode_auto
+                    else -> R.string.mode_always
+                }))
+                ReadOnlyRow(stringResource(R.string.set_interval), stringResource(R.string.interval_s, vm.intervalSec))
+                ReadOnlyRow(stringResource(R.string.limit_title), if (limit == 0) stringResource(R.string.limit_off) else stringResource(R.string.limit_kmh, limit))
+                ReadOnlyRow(stringResource(R.string.guard_parking), if (prefs.parkingArmed) stringResource(R.string.ctl_arm) else stringResource(R.string.ctl_disarm))
+                ReadOnlyRow(stringResource(R.string.safety_crash), if (crash) stringResource(R.string.ctl_arm) else stringResource(R.string.ctl_disarm))
+                ReadOnlyRow(stringResource(R.string.safety_number), number.ifBlank { stringResource(R.string.none) })
+                ReadOnlyRow(stringResource(R.string.set_service), if (serviceEvery == 0) stringResource(R.string.service_off) else stringResource(R.string.service_every, serviceEvery))
+            }
+        }
+
+        if (!isTracker) {
         // ---- tracking mode ----
         Panel(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.set_mode), style = MaterialTheme.typography.titleMedium)
@@ -132,17 +200,19 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         Panel(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.set_safety), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
-            SwitchRow(stringResource(R.string.safety_crash), null, crash) { crash = it; prefs.crashDetection = it }
+            SwitchRow(stringResource(R.string.safety_crash), null, crash) { crash = it; prefs.crashDetection = it; vm.pushSettings() }
             SwitchRow(stringResource(R.string.safety_sms), stringResource(R.string.safety_sms_hint), sms) { on ->
                 if (!on) { sms = false; prefs.sosSms = false }
                 else smsPerm.launch(Manifest.permission.SEND_SMS)
+                vm.pushSettings()
             }
             if (smsDenied) Text(stringResource(R.string.sms_perm_needed), color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
             OutlinedTextField(
                 value = number, onValueChange = { number = it; prefs.emergencyNumber = it.trim() }, singleLine = true,
                 label = { Text(stringResource(R.string.safety_number)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    .onFocusChanged { if (!it.isFocused) vm.pushSettings() },
             )
             Spacer(Modifier.height(14.dp))
             Text(stringResource(R.string.limit_title), style = MaterialTheme.typography.titleMedium)
@@ -150,15 +220,17 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             ChipRow(
                 listOf(0, 60, 80, 100, 120), limit,
                 { if (it == 0) ctx.getString(R.string.limit_off) else ctx.getString(R.string.limit_kmh, it) },
-            ) { limit = it; prefs.speedLimitKmh = it; prefs.stateDirty = true }
+            ) { limit = it; prefs.speedLimitKmh = it; prefs.stateDirty = true; vm.pushSettings() }
         }
 
         // ---- service reminder ----
         Panel(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.set_service), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(4.dp))
-            Text(stringResource(R.string.service_odo, odo), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
-            if (next > 0) Text(stringResource(R.string.service_next, next), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+            if (!isRemote) {
+                Spacer(Modifier.height(4.dp))
+                Text(stringResource(R.string.service_odo, odo), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+                if (next > 0) Text(stringResource(R.string.service_next, next), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+            }
             Spacer(Modifier.height(8.dp))
             ChipRow(
                 listOf(0, 1000, 2000, 3000, 5000), serviceEvery,
@@ -166,10 +238,11 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             ) {
                 serviceEvery = it; prefs.scheduleService(it)
                 odo = prefs.odometerKm.toInt(); next = prefs.nextServiceKm.toInt()
+                vm.pushSettings()
             }
             if (serviceEvery > 0) {
                 Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = { prefs.markServiced(); next = prefs.nextServiceKm.toInt() }) {
+                OutlinedButton(onClick = { prefs.markServiced(); next = prefs.nextServiceKm.toInt(); vm.pushSettings() }) {
                     Text(stringResource(R.string.service_mark))
                 }
             }
@@ -184,6 +257,90 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             if (lockMsg) Text(stringResource(R.string.lock_unavailable), color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
         }
 
+        // ---- guard schedule (Remote only) ----
+        if (isRemote) {
+            Panel(Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.schedule_title), style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(4.dp))
+                Text(stringResource(R.string.schedule_desc), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = schedStart, onValueChange = { schedStart = it.filter { c -> c.isDigit() }.take(2) },
+                        singleLine = true, label = { Text(stringResource(R.string.schedule_start)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f).onFocusChanged {
+                            if (!it.isFocused) {
+                                prefs.guardScheduleStart = schedStart.toIntOrNull()?.takeIf { h -> h in 0..23 } ?: -1
+                                vm.pushSettings()
+                            }
+                        },
+                    )
+                    OutlinedTextField(
+                        value = schedEnd, onValueChange = { schedEnd = it.filter { c -> c.isDigit() }.take(2) },
+                        singleLine = true, label = { Text(stringResource(R.string.schedule_end)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f).onFocusChanged {
+                            if (!it.isFocused) {
+                                prefs.guardScheduleEnd = schedEnd.toIntOrNull()?.takeIf { h -> h in 0..23 } ?: -1
+                                vm.pushSettings()
+                            }
+                        },
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = {
+                    schedStart = ""; schedEnd = ""
+                    prefs.guardScheduleStart = -1; prefs.guardScheduleEnd = -1
+                    vm.pushSettings()
+                }) { Text(stringResource(R.string.schedule_off)) }
+            }
+
+            // ---- low-data mode (this phone's Viewer) ----
+            Panel(Modifier.fillMaxWidth()) {
+                SwitchRow(stringResource(R.string.lowdata_title), stringResource(R.string.lowdata_desc), lowData) {
+                    lowData = it; prefs.lowDataMode = it
+                }
+            }
+
+            // ---- family view-only invite ----
+            Panel(Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.family_title), style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(4.dp))
+                Text(stringResource(R.string.family_desc), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = { vm.createFamilyInvite { familyCode = it } }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.family_generate))
+                }
+                familyCode?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(stringResource(R.string.family_code, it), style = MaterialTheme.typography.titleMedium, color = Palette.Ember)
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = inviteInput, onValueChange = { inviteInput = it.trim(); inviteSaved = false }, singleLine = true,
+                    label = { Text(stringResource(R.string.family_use)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        vm.setInviteCode(inviteInput); inviteSaved = inviteInput.isNotBlank()
+                    }) { Text(stringResource(R.string.add)) }
+                    if (vm.inviteCode != null) {
+                        OutlinedButton(onClick = { vm.clearInviteCode(); inviteInput = ""; inviteSaved = false }) {
+                            Text(stringResource(R.string.invite_clear))
+                        }
+                    }
+                }
+                if (inviteSaved) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(stringResource(R.string.family_saved), color = Palette.Signal, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+        } // end of editable settings (tracker role sees them read-only above)
+
         // ---- battery ----
         Panel(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.battery_title), style = MaterialTheme.typography.titleMedium)
@@ -191,6 +348,57 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             Text(stringResource(R.string.battery_body), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(12.dp))
             OutlinedButton(onClick = { openBatterySettings(ctx) }) { Text(stringResource(R.string.open_settings)) }
+        }
+
+        // ---- phone role ----
+        Panel(Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.set_role), style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(
+                    R.string.role_current,
+                    stringResource(
+                        if (isTracker) R.string.role_tracker
+                        else if (vm.role.isEmpty()) R.string.invite_mode
+                        else R.string.role_remote
+                    ),
+                ),
+                color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(onClick = { pinInput = ""; pinWrong = false; showPinDialog = true }) {
+                Text(stringResource(R.string.role_change))
+            }
+        }
+
+        if (showPinDialog) {
+            AlertDialog(
+                onDismissRequest = { showPinDialog = false },
+                containerColor = Palette.Surface,
+                title = { Text(stringResource(R.string.role_change_title)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = pinInput,
+                            onValueChange = { pinInput = it.filter { c -> c.isDigit() }.take(4); pinWrong = false },
+                            singleLine = true, label = { Text(stringResource(R.string.pin_label)) },
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (pinWrong) Text(stringResource(R.string.role_pin_wrong), color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        if (vm.clearRoleAfterPin(pinInput)) showPinDialog = false
+                        else pinWrong = true
+                    }) { Text(stringResource(R.string.continue_label)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showPinDialog = false }) { Text(stringResource(R.string.close)) }
+                },
+            )
         }
 
         // ---- account ----
@@ -213,6 +421,14 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             stringResource(R.string.version, BuildConfig.VERSION_NAME),
             color = Palette.Muted, style = MaterialTheme.typography.labelMedium,
         )
+    }
+}
+
+@Composable
+private fun ReadOnlyRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = Palette.Muted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.titleMedium)
     }
 }
 

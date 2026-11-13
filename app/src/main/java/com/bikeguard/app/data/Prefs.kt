@@ -11,6 +11,10 @@ const val MODE_MANUAL = "manual"
 const val MODE_ALWAYS = "always"
 const val MODE_AUTO = "auto"
 
+/** Phone roles (v1.1.0): the bike phone only tracks, the owner's phone only controls. */
+const val ROLE_TRACKER = "tracker"
+const val ROLE_REMOTE = "remote"
+
 /** Tokens and settings. Encrypted with the Android Keystore; falls back to plain prefs only if the Keystore is broken. */
 class Prefs(context: Context) {
     private val sp: SharedPreferences = try {
@@ -115,12 +119,54 @@ class Prefs(context: Context) {
         get() = sp.getLong("alerts_seen", 0L)
         set(v) = sp.edit { putLong("alerts_seen", v) }
 
+    // ---- v1.1.0 roles + server-synced settings ----
+    /** "" = not picked yet, ROLE_TRACKER or ROLE_REMOTE. */
+    var appRole: String
+        get() = sp.getString("role", "") ?: ""
+        set(v) = sp.edit { putString("role", v) }
+    /** 4-digit PIN set when the role is first picked; needed to change the role later. */
+    var rolePin: String
+        get() = sp.getString("role_pin", "") ?: ""
+        set(v) = sp.edit { putString("role_pin", v) }
+    /** Family view-only invite code entered on this phone (read-only Viewer, no controls). */
+    var viewerInviteCode: String?
+        get() = sp.getString("invite_code", null)
+        set(v) = sp.edit { putString("invite_code", v) }
+    /** The bike device the Remote phone controls (its device_settings row). Empty = this phone. */
+    var remoteTargetDeviceId: String
+        get() = sp.getString("remote_target", "") ?: ""
+        set(v) = sp.edit { putString("remote_target", v) }
+    var lowDataMode: Boolean
+        get() = sp.getBoolean("low_data", false)
+        set(v) = sp.edit { putBoolean("low_data", v) }
+    /** Guard schedule from the server: hours 0-23, -1 = no schedule. */
+    var guardScheduleStart: Int
+        get() = sp.getInt("sched_start", -1)
+        set(v) = sp.edit { putInt("sched_start", v) }
+    var guardScheduleEnd: Int
+        get() = sp.getInt("sched_end", -1)
+        set(v) = sp.edit { putInt("sched_end", v) }
+    /** True while the guard was armed by the schedule (so it can be disarmed when the window ends). */
+    var scheduleArmed: Boolean
+        get() = sp.getBoolean("sched_armed", false)
+        set(v) = sp.edit { putBoolean("sched_armed", v) }
+    /** Last health state seen by the health watch ("fine=true|batt=true"); a change raises an alert. */
+    var lastHealthState: String
+        get() = sp.getString("health_state", "") ?: ""
+        set(v) = sp.edit { putString("health_state", v) }
+
+    val isTracker: Boolean get() = appRole == ROLE_TRACKER
+    val isRemote: Boolean get() = appRole == ROLE_REMOTE
+    val isInviteMode: Boolean get() = !viewerInviteCode.isNullOrBlank()
+
     val isLoggedIn: Boolean get() = !refreshToken.isNullOrEmpty()
-    val shouldTrack: Boolean get() = isLoggedIn && (trackingActive || mode == MODE_ALWAYS || parkingArmed)
+    /** The Remote phone never tracks, even if an old install left tracking prefs behind. */
+    val shouldTrack: Boolean get() = isLoggedIn && !isRemote && (trackingActive || mode == MODE_ALWAYS || parkingArmed)
 
     fun clearSession() = sp.edit {
         remove("at"); remove("rt"); remove("uid"); remove("email")
         remove("device_id"); putBoolean("device_registered", false); putBoolean("tracking_active", false)
         putBoolean("armed", false); putBoolean("state_dirty", true)
+        remove("invite_code")
     }
 }

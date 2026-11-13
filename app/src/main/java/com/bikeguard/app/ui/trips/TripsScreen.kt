@@ -31,6 +31,12 @@ import com.bikeguard.app.ui.fmtTime
 import com.bikeguard.app.ui.theme.Palette
 import com.bikeguard.app.ui.theme.Panel
 
+private fun shareText(ctx: android.content.Context, text: String) {
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+        .putExtra(android.content.Intent.EXTRA_TEXT, text)
+    ctx.startActivity(android.content.Intent.createChooser(send, null))
+}
+
 @Composable
 fun TripsScreen(modifier: Modifier = Modifier, vm: TripsViewModel = viewModel()) {
     LaunchedEffect(Unit) { vm.load() }
@@ -77,6 +83,30 @@ private fun TripList(modifier: Modifier, vm: TripsViewModel) {
                 Text(stringResource(R.string.trips_empty_body), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
             }
             else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+                item {
+                    vm.weeklySummary?.let { w ->
+                        Panel(Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.weekly_title), style = MaterialTheme.typography.titleMedium)
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "${stringResource(R.string.weekly_trips, w.trips)}  ·  " +
+                                    ctx.getString(R.string.unit_km, w.km) + "  ·  " +
+                                    fmtDuration(ctx, w.minutes * 60_000L) + "  ·  " +
+                                    stringResource(R.string.trip_max, w.topSpeed.toInt()),
+                                color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { shareText(ctx, vm.weeklyCsv()) }) {
+                                    Text(stringResource(R.string.export_csv))
+                                }
+                                OutlinedButton(onClick = {
+                                    vm.exportLatestTripGpx { gpx -> if (gpx != null) shareText(ctx, gpx) }
+                                }) { Text(stringResource(R.string.export_gpx)) }
+                            }
+                        }
+                    }
+                }
                 items(trips, key = { it.startedAt }) { t -> TripCard(ctx, t) { vm.open(t) } }
             }
         }
