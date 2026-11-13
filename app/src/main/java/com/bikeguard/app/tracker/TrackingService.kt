@@ -96,9 +96,13 @@ class TrackingService : Service() {
                         is IOException -> "no internet"
                         else -> "sync error"
                     }
+                    val prevError = app.prefs.lastSyncError
                     app.prefs.lastSyncError = reason
                     app.prefs.lastSyncAttemptMs = System.currentTimeMillis()
                     TrackerState.online.value = false
+                    if (reason != prevError) {
+                        scope.launch { app.diag.report("flush loop error: $reason") }
+                    }
                     delay(10_000)
                 }
             }

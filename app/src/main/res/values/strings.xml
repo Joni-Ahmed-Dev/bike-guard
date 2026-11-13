@@ -266,4 +266,31 @@
     <string name="sync_test_checking">Checking…</string>
     <string name="sync_test_ok">Connected — data uploaded</string>
     <string name="sync_test_project">Project: %1$s</string>
+
+    <string name="diag_title">Diagnostics</string>
+    <string name="diag_back">Back</string>
+    <string name="diag_send">Send report now</string>
+    <string name="diag_sending">Sending…</string>
+    <string name="diag_sent">Report sent</string>
+    <string name="diag_failed">Report failed, check connection</string>
+    <string name="diag_not_configured">Reporting is not set up in this build</string>
+    <string name="diag_account">Account</string>
+    <string name="diag_role">Role</string>
+    <string name="diag_role_tracker">Tracker</string>
+    <string name="diag_role_remote">Remote</string>
+    <string name="diag_role_none">Not picked</string>
+    <string name="diag_device">Device</string>
+    <string name="diag_version">Version</string>
+    <string name="diag_worker">Report server</string>
+    <string name="diag_tracking">Tracking</string>
+    <string name="diag_running">Running</string>
+    <string name="diag_stopped">Stopped</string>
+    <string name="diag_last_fix">Last fix</string>
+    <string name="diag_queued">Waiting to upload</string>
+    <string name="diag_last_sync">Last sync</string>
+    <string name="diag_last_report">Last report</string>
+    <string name="diag_never">Never</string>
+    <string name="diag_ok">OK</string>
+    <string name="diag_failed_short">Failed</string>
+    <string name="diag_hint">This report goes to the diagnostics server so the app problem can be seen without a screenshot. No location is sent.</string>
 </resources>

@@ -10,11 +10,13 @@ import com.bikeguard.app.data.AppDatabase
 import com.bikeguard.app.data.Prefs
 import com.bikeguard.app.data.SupabaseApi
 import com.bikeguard.app.data.RealtimeClient
+import com.bikeguard.app.data.DiagReporter
 import com.bikeguard.app.data.SyncManager
 import com.bikeguard.app.tracker.TrackerState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import com.bikeguard.app.data.MODE_AUTO
 import com.bikeguard.app.tracker.AutoMode
 import com.bikeguard.app.tracker.WatchdogWorker
@@ -26,6 +28,7 @@ class BikeGuardApp : Application() {
     lateinit var db: AppDatabase
     lateinit var sync: SyncManager
     lateinit var realtime: RealtimeClient
+    lateinit var diag: DiagReporter
 
     /** Outlives screens and the tracking service: used for uploads, alerts and the SOS countdown. */
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -35,8 +38,12 @@ class BikeGuardApp : Application() {
         prefs = Prefs(this)
         api = SupabaseApi(prefs)
         db = AppDatabase.get(this)
-        sync = SyncManager(db.pending(), db.events(), api, prefs)
+        diag = DiagReporter(this, prefs, db.pending())
+        sync = SyncManager(db.pending(), db.events(), api, prefs, diag, appScope)
         realtime = RealtimeClient(api)
+        // Report the app's state to the diagnostics Worker on every start,
+        // so Muse can see the tracker even when Supabase sync is failing.
+        appScope.launch { diag.report("app start") }
         TrackerState.armed.value = prefs.parkingArmed
         createChannels()
         if (prefs.isLoggedIn && prefs.mode == MODE_AUTO && !prefs.isRemote) AutoMode.enable(this)

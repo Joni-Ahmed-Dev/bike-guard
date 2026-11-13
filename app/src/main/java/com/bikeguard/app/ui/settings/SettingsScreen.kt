@@ -38,6 +38,7 @@ import com.bikeguard.app.data.MODE_MANUAL
 import com.bikeguard.app.tracker.AutoMode
 import com.bikeguard.app.ui.AppViewModel
 import com.bikeguard.app.ui.openBatterySettings
+import com.bikeguard.app.ui.diagnostics.DiagnosticsScreen
 import com.bikeguard.app.ui.theme.Palette
 import com.bikeguard.app.ui.theme.Panel
 import kotlinx.coroutines.launch
@@ -83,6 +84,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     var testing by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var testOk by remember { mutableStateOf(false) }
+    var showDiagnostics by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { if (isRemote) vm.loadRemoteSettings() }
@@ -104,7 +106,19 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        if (showDiagnostics) {
+            DiagnosticsScreen(onBack = { showDiagnostics = false }, Modifier.fillMaxSize())
+            return@Column
+        }
         Text(stringResource(R.string.tab_settings), style = MaterialTheme.typography.headlineMedium)
+
+        // ---- diagnostics: what is happening inside the app, and a report to Muse ----
+        Panel(Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = { showDiagnostics = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(stringResource(R.string.diag_title)) }
+        }
 
         // ---- sync status (Remote only): did the bike phone apply the settings? ----
         if (isRemote) {

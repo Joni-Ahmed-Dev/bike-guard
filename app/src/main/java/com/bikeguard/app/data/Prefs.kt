@@ -128,6 +128,15 @@ class Prefs(context: Context) {
         get() = sp.getLong("last_sync_attempt", 0L)
         set(v) = sp.edit { putLong("last_sync_attempt", v) }
 
+    /** Last diagnostics report sent to the bikeguard-diag Worker, in millis since epoch; 0 = never sent. */
+    var lastDiagReportAtMs: Long
+        get() = sp.getLong("last_diag_report", 0L)
+        set(v) = sp.edit { putLong("last_diag_report", v) }
+    /** Whether the last diagnostics report was accepted by the Worker. */
+    var lastDiagReportOk: Boolean
+        get() = sp.getBoolean("last_diag_ok", false)
+        set(v) = sp.edit { putBoolean("last_diag_ok", v) }
+
     // ---- v1.1.0 roles + server-synced settings ----
     /** "" = not picked yet, ROLE_TRACKER or ROLE_REMOTE. */
     var appRole: String

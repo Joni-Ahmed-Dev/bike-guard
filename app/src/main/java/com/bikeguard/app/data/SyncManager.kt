@@ -1,6 +1,8 @@
 package com.bikeguard.app.data
 
 import android.os.Build
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.IOException
@@ -11,6 +13,8 @@ class SyncManager(
     private val events: EventDao,
     private val api: SupabaseApi,
     private val prefs: Prefs,
+    private val diag: DiagReporter? = null,
+    private val scope: CoroutineScope? = null,
 ) {
     private val mutex = Mutex()
 
@@ -19,9 +23,17 @@ class SyncManager(
 
     /** @return true when everything uploaded, false when something must be retried. */
     suspend fun flush(): Boolean = mutex.withLock {
+        val prevError = prefs.lastSyncError
         val outcome = flushLocked()
         prefs.lastSyncAttemptMs = System.currentTimeMillis()
         prefs.lastSyncError = if (outcome.ok) "" else (outcome.error ?: "no internet")
+        // Report state changes to the diagnostics Worker (only when the
+        // failure reason changes, so a stuck offline phone does not spam it).
+        if (!outcome.ok && outcome.error != prevError) {
+            scope?.launch { diag?.report("sync failed: ${outcome.error ?: "no internet"}") }
+        } else if (outcome.ok && prevError.isNotBlank()) {
+            scope?.launch { diag?.report("sync recovered") }
+        }
         outcome.ok
     }
 

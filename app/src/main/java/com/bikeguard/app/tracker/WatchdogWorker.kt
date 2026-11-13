@@ -18,6 +18,9 @@ class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         val app = applicationContext.bikeApp
         app.sync.flush()
+        // Heartbeat to the diagnostics Worker, so Muse can see the tracker
+        // is alive even when Supabase sync is failing.
+        app.diag.report("heartbeat")
         if (app.prefs.shouldTrack && !TrackerState.running.value && Perms.hasFine(app)) {
             if (!app.tryStartTracking()) notifyResume(app)
         }

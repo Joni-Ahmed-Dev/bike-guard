@@ -266,4 +266,31 @@
     <string name="sync_test_checking">পরীক্ষা করা হচ্ছে…</string>
     <string name="sync_test_ok">সংযোগ হয়েছে, ডাটা আপলোড হয়েছে</string>
     <string name="sync_test_project">প্রকল্প: %1$s</string>
+
+    <string name="diag_title">ডায়াগনস্টিকস</string>
+    <string name="diag_back">ফিরে যান</string>
+    <string name="diag_send">এখনই রিপোর্ট পাঠাও</string>
+    <string name="diag_sending">পাঠানো হচ্ছে…</string>
+    <string name="diag_sent">রিপোর্ট পাঠানো হয়েছে</string>
+    <string name="diag_failed">রিপোর্ট যায়নি, সংযোগ দেখো</string>
+    <string name="diag_not_configured">এই বিল্ডে রিপোর্ট চালু নেই</string>
+    <string name="diag_account">অ্যাকাউন্ট</string>
+    <string name="diag_role">ভূমিকা</string>
+    <string name="diag_role_tracker">ট্র্যাকার</string>
+    <string name="diag_role_remote">রিমোট</string>
+    <string name="diag_role_none">বাছা হয়নি</string>
+    <string name="diag_device">ডিভাইস</string>
+    <string name="diag_version">ভার্সন</string>
+    <string name="diag_worker">রিপোর্ট সার্ভার</string>
+    <string name="diag_tracking">ট্র্যাকিং</string>
+    <string name="diag_running">চলছে</string>
+    <string name="diag_stopped">বন্ধ</string>
+    <string name="diag_last_fix">শেষ লোকেশন</string>
+    <string name="diag_queued">আপলোডের অপেক্ষায়</string>
+    <string name="diag_last_sync">শেষ সিঙ্ক</string>
+    <string name="diag_last_report">শেষ রিপোর্ট</string>
+    <string name="diag_never">কখনো না</string>
+    <string name="diag_ok">ঠিক আছে</string>
+    <string name="diag_failed_short">ব্যর্থ</string>
+    <string name="diag_hint">এই রিপোর্ট ডায়াগনস্টিকস সার্ভারে যায়, যাতে স্ক্রিনশট ছাড়াই অ্যাপের সমস্যা দেখা যায়। কোনো লোকেশন পাঠানো হয় না।</string>
 </resources>
