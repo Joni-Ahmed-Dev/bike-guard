@@ -24,7 +24,7 @@ class SyncManager(
 
     private suspend fun flushLocked(): Boolean {
         if (!prefs.isLoggedIn) return true
-        try {
+        return try {
             if (!prefs.deviceRegistered) {
                 val name = "${Build.MANUFACTURER} ${Build.MODEL}".trim()
                 if (!api.registerDevice(prefs.deviceId, name)) return false
