@@ -19,7 +19,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Write config (anon key is public by design; RLS protects data)
-        run: echo "window.BG = { url: '${{ secrets.SUPABASE_URL }}', key: '${{ secrets.SUPABASE_ANON_KEY }}' };" > docs/config.js
+        run: |
+          echo "window.BG = { url: '${{ secrets.SUPABASE_URL }}', key: '${{ secrets.SUPABASE_ANON_KEY }}' };" > docs/config.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
