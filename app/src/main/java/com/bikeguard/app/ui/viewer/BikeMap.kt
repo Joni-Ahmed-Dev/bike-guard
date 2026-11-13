@@ -39,8 +39,8 @@ import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 
-/** OpenStreetMap data via OpenFreeMap (free, no API key). Other styles: liberty, bright, positron, fiord. */
-private const val MAP_STYLE = "https://tiles.openfreemap.org/styles/dark"
+/** OpenStreetMap data via OpenFreeMap (free, no API key). Other styles: liberty, dark, positron, fiord. */
+private const val MAP_STYLE = "https://tiles.openfreemap.org/styles/bright"
 private const val SIGNAL = "#3DDBD9"
 private const val EMBER = "#FF9F1C"
 
