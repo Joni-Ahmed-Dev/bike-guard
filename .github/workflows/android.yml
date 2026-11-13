@@ -14,6 +14,7 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       SHARE_BASE_URL: ${{ secrets.SHARE_BASE_URL }}
+      DIAG_TOKEN: ${{ secrets.DIAG_TOKEN }}
       KEYSTORE_PATH: keystore.jks
       KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
       KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
