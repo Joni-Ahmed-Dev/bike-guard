@@ -1,0 +1,27 @@
+name: Share page
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write config (anon key is public by design; RLS protects data)
+        run: echo "window.BG = { url: '${{ secrets.SUPABASE_URL }}', key: '${{ secrets.SUPABASE_ANON_KEY }}' };" > docs/config.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - uses: actions/deploy-pages@v4
