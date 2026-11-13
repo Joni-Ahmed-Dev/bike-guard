@@ -119,6 +119,15 @@ class Prefs(context: Context) {
         get() = sp.getLong("alerts_seen", 0L)
         set(v) = sp.edit { putLong("alerts_seen", v) }
 
+    /** Last upload failure reason ("no internet" / "timed out" / "server 401"); "" when the last try worked. */
+    var lastSyncError: String
+        get() = sp.getString("last_sync_error", "") ?: ""
+        set(v) = sp.edit { putString("last_sync_error", v) }
+    /** When the last upload was tried, in millis since epoch; 0 = never tried yet. */
+    var lastSyncAttemptMs: Long
+        get() = sp.getLong("last_sync_attempt", 0L)
+        set(v) = sp.edit { putLong("last_sync_attempt", v) }
+
     // ---- v1.1.0 roles + server-synced settings ----
     /** "" = not picked yet, ROLE_TRACKER or ROLE_REMOTE. */
     var appRole: String

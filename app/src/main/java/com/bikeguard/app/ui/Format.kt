@@ -50,3 +50,4 @@ fun fmtDuration(ctx: Context, ms: Long): String {
 fun fmtDate(ms: Long): String = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(ms))
 fun fmtTime(ms: Long): String = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(ms))
 fun fmtClock(ms: Long): String = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(ms))
+fun fmtHourMin(ms: Long): String = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ms))

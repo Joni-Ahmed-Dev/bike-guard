@@ -52,6 +52,7 @@ import com.bikeguard.app.tracker.GuardControl
 import com.bikeguard.app.tracker.TrackerState
 import com.bikeguard.app.ui.AppViewModel
 import com.bikeguard.app.ui.agoText
+import com.bikeguard.app.ui.fmtHourMin
 import com.bikeguard.app.ui.openBatterySettings
 import com.bikeguard.app.ui.rememberNow
 import com.bikeguard.app.ui.theme.Palette
@@ -80,6 +81,10 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     val queued by ctx.bikeApp.db.pending().count().collectAsStateWithLifecycle(0)
     val now = rememberNow()
     val always = vm.mode == MODE_ALWAYS
+    val prefs = ctx.bikeApp.prefs
+    // Last upload failure, if any: refreshed by rememberNow() ticking every second.
+    val lastSyncError = prefs.lastSyncError
+    val lastSyncAttemptMs = prefs.lastSyncAttemptMs
 
     Column(
         modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
@@ -146,6 +151,14 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 StatCard(stringResource(R.string.stat_accuracy), fix?.let { stringResource(R.string.unit_m, it.accuracy.toInt()) } ?: stringResource(R.string.none), Modifier.weight(1f))
                 StatCard(stringResource(R.string.stat_queued), stringResource(R.string.unit_points, queued), Modifier.weight(1f), highlight = queued > 5)
             }
+            if (lastSyncError.isNotBlank() && lastSyncAttemptMs > 0) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.sync_last_try, fmtHourMin(lastSyncAttemptMs), syncReasonText(lastSyncError)),
+                    color = Palette.Ember, style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
+                )
+            }
             Spacer(Modifier.height(16.dp))
             SosButton { GuardControl.sos(ctx) }
             if (!batteryOk) {
@@ -202,6 +215,14 @@ private fun StatusRing(running: Boolean, offline: Boolean, always: Boolean, idle
             )
         }
     }
+}
+
+@Composable
+private fun syncReasonText(reason: String): String = when {
+    reason == "no internet" -> stringResource(R.string.sync_err_no_internet)
+    reason == "timed out" -> stringResource(R.string.sync_err_timeout)
+    reason.startsWith("server ") -> stringResource(R.string.sync_err_server, reason.removePrefix("server ").trim())
+    else -> reason
 }
 
 @Composable

@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +40,7 @@ import com.bikeguard.app.ui.AppViewModel
 import com.bikeguard.app.ui.openBatterySettings
 import com.bikeguard.app.ui.theme.Palette
 import com.bikeguard.app.ui.theme.Panel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +80,10 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     var showPinDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
     var pinWrong by remember { mutableStateOf(false) }
+    var testing by remember { mutableStateOf(false) }
+    var testResult by remember { mutableStateOf<String?>(null) }
+    var testOk by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { if (isRemote) vm.loadRemoteSettings() }
 
@@ -147,6 +153,32 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 ReadOnlyRow(stringResource(R.string.safety_crash), if (crash) stringResource(R.string.ctl_arm) else stringResource(R.string.ctl_disarm))
                 ReadOnlyRow(stringResource(R.string.safety_number), number.ifBlank { stringResource(R.string.none) })
                 ReadOnlyRow(stringResource(R.string.set_service), if (serviceEvery == 0) stringResource(R.string.service_off) else stringResource(R.string.service_every, serviceEvery))
+            }
+            Panel(Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = {
+                        if (testing) return@Button
+                        testing = true; testResult = null
+                        scope.launch {
+                            val ok = ctx.bikeApp.sync.flush()
+                            val err = prefs.lastSyncError
+                            testOk = ok
+                            testResult = if (ok) ctx.getString(R.string.sync_test_ok)
+                            else when {
+                                err == "no internet" -> ctx.getString(R.string.sync_err_no_internet)
+                                err == "timed out" -> ctx.getString(R.string.sync_err_timeout)
+                                err.startsWith("server ") -> ctx.getString(R.string.sync_err_server, err.removePrefix("server ").trim())
+                                else -> ctx.getString(R.string.sync_err_no_internet)
+                            }
+                            testing = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(if (testing) R.string.sync_test_checking else R.string.sync_test)) }
+                testResult?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(it, color = if (testOk) Palette.Signal else Palette.Danger, style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
 

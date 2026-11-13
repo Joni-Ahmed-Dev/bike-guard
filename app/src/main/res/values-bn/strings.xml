@@ -253,4 +253,12 @@
     <string name="invite_mode">শুধু দেখা যাবে (পরিবারের আমন্ত্রণ)</string>
 
     <string name="invite_clear">আমন্ত্রণ সরান</string>
+
+    <string name="sync_last_try">শেষ চেষ্টা %1$s — %2$s</string>
+    <string name="sync_err_no_internet">ইন্টারনেট নেই</string>
+    <string name="sync_err_timeout">সময় শেষ হয়ে গেছে</string>
+    <string name="sync_err_server">সার্ভার %1$s</string>
+    <string name="sync_test">সংযোগ পরীক্ষা করুন</string>
+    <string name="sync_test_checking">পরীক্ষা করা হচ্ছে…</string>
+    <string name="sync_test_ok">সংযোগ হয়েছে, ডাটা আপলোড হয়েছে</string>
 </resources>

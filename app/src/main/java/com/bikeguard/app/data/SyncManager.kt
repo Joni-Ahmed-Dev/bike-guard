@@ -16,11 +16,18 @@ class SyncManager(
 
     /** @return true when the queue is empty (everything uploaded), false when something must be retried. */
     suspend fun flush(): Boolean = mutex.withLock {
-        if (!prefs.isLoggedIn) return@withLock true
+        val ok = flushLocked()
+        prefs.lastSyncAttemptMs = System.currentTimeMillis()
+        prefs.lastSyncError = if (ok) "" else (api.lastSyncError ?: "no internet")
+        ok
+    }
+
+    private suspend fun flushLocked(): Boolean {
+        if (!prefs.isLoggedIn) return true
         try {
             if (!prefs.deviceRegistered) {
                 val name = "${Build.MANUFACTURER} ${Build.MODEL}".trim()
-                if (!api.registerDevice(prefs.deviceId, name)) return@withLock false
+                if (!api.registerDevice(prefs.deviceId, name)) return false
                 prefs.deviceRegistered = true
             }
             var allSent = true

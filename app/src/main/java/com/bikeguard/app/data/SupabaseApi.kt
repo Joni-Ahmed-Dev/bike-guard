@@ -26,9 +26,9 @@ import java.util.concurrent.TimeUnit
 /** Thin Supabase client (GoTrue auth + PostgREST) over OkHttp. No heavy SDK, easy to audit. */
 class SupabaseApi(private val prefs: Prefs) {
     private val http = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .writeTimeout(20, TimeUnit.SECONDS)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
         .build()
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
     private val jsonType = "application/json; charset=utf-8".toMediaType()
@@ -37,6 +37,10 @@ class SupabaseApi(private val prefs: Prefs) {
 
     /** Flips to true when the refresh token is rejected, so the UI can send the user back to sign-in. */
     val sessionExpired = MutableStateFlow(false)
+
+    /** Last upload failure reason: "no internet", "timed out" or "server <code>"; null when the last call worked. */
+    var lastSyncError: String? = null
+        private set
 
     val isConfigured get() = BuildConfig.SUPABASE_URL.startsWith("http") && BuildConfig.SUPABASE_ANON_KEY.isNotBlank()
 
@@ -48,7 +52,19 @@ class SupabaseApi(private val prefs: Prefs) {
         .header("Authorization", "Bearer " + (token ?: BuildConfig.SUPABASE_ANON_KEY))
 
     private suspend fun exec(r: Request): Resp = withContext(Dispatchers.IO) {
-        http.newCall(r).execute().use { Resp(it.code, it.body?.string().orEmpty()) }
+        try {
+            http.newCall(r).execute().use { resp ->
+                val out = Resp(resp.code, resp.body?.string().orEmpty())
+                lastSyncError = if (out.ok) null else "server ${out.code}"
+                out
+            }
+        } catch (e: java.net.SocketTimeoutException) {
+            lastSyncError = "timed out"
+            throw e
+        } catch (e: IOException) {
+            lastSyncError = "no internet"
+            throw e
+        }
     }
 
     private suspend fun authed(make: (String) -> Request): Resp {

@@ -253,4 +253,12 @@
     <string name="invite_mode">View-only (family invite)</string>
 
     <string name="invite_clear">Remove invite</string>
+
+    <string name="sync_last_try">Last try %1$s — %2$s</string>
+    <string name="sync_err_no_internet">No internet</string>
+    <string name="sync_err_timeout">Timed out</string>
+    <string name="sync_err_server">Server %1$s</string>
+    <string name="sync_test">Test connection</string>
+    <string name="sync_test_checking">Checking…</string>
+    <string name="sync_test_ok">Connected — data uploaded</string>
 </resources>
