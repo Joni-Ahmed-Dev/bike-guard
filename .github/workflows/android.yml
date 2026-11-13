@@ -35,8 +35,11 @@ jobs:
       - name: Decode release keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then echo "$KEYSTORE_BASE64" | base64 -d > app/keystore.jks; fi
+          ls -l app/keystore.jks
+          keytool -list -keystore app/keystore.jks -storepass "$KEYSTORE_PASSWORD" || echo KEYSTORE_LIST_FAILED
       - name: Build release APK
         run: gradle :app:assembleRelease --stacktrace
       - uses: actions/upload-artifact@v4
