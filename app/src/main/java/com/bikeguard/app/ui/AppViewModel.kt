@@ -72,10 +72,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun signOut() { viewModelScope.launch { endSession(flushFirst = true) } }
 
     private suspend fun endSession(flushFirst: Boolean) {
-        if (flushFirst) withTimeoutOrNull(5_000) { app.sync.flush() } // best effort: don't lose queued points
+        // Best effort: don't lose queued points. The queue is only wiped when the flush
+        // actually succeeded (it is empty then); a failed or skipped flush keeps the points.
+        val flushed = if (flushFirst) withTimeoutOrNull(5_000) { app.sync.flush() } == true else false
         TrackingService.stop(app)
         AutoMode.disable(app)
-        withContext(Dispatchers.IO) { app.db.pending().clear() }
+        if (flushed) withContext(Dispatchers.IO) { app.db.pending().clear() }
         app.prefs.clearSession()
         TrackerState.lastFix.value = null
         TrackerState.armed.value = false
@@ -139,12 +141,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         speedLimitKmh = app.prefs.speedLimitKmh,
         guardArmed = app.prefs.parkingArmed,
         autoArm = app.prefs.autoArm,
+        sirenOnAlert = app.prefs.sirenOnAlert,
+        sosSms = app.prefs.sosSms,
         crashEnabled = app.prefs.crashDetection,
         sosNumber = app.prefs.emergencyNumber,
         serviceKm = app.prefs.serviceIntervalKm,
         guardScheduleStart = app.prefs.guardScheduleStart.takeIf { it in 0..23 },
         guardScheduleEnd = app.prefs.guardScheduleEnd.takeIf { it in 0..23 },
     )
+
+    /** Sends a one-off command (e.g. mark_serviced) to the bike from the Remote phone. */
+    fun sendRemoteCommand(type: String, arg: String? = null) {
+        viewModelScope.launch {
+            try { app.api.sendCommand(settingsTargetId, type, arg) } catch (e: Exception) { }
+        }
+    }
 
     /** Pushes this phone's settings to the server. Call after any Remote settings change. */
     fun pushSettings() {
@@ -172,6 +183,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             app.prefs.speedLimitKmh = s.speedLimitKmh
             app.prefs.parkingArmed = s.guardArmed
             app.prefs.autoArm = s.autoArm
+            app.prefs.sirenOnAlert = s.sirenOnAlert
+            app.prefs.sosSms = s.sosSms
             app.prefs.crashDetection = s.crashEnabled
             app.prefs.emergencyNumber = s.sosNumber
             app.prefs.serviceIntervalKm = s.serviceKm

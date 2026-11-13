@@ -14,53 +14,67 @@ class SyncManager(
 ) {
     private val mutex = Mutex()
 
-    /** @return true when the queue is empty (everything uploaded), false when something must be retried. */
+    /** One flush's outcome: whether everything uploaded, and the local reason when it did not. */
+    data class FlushOutcome(val ok: Boolean, val error: String? = null)
+
+    /** @return true when everything uploaded, false when something must be retried. */
     suspend fun flush(): Boolean = mutex.withLock {
-        val ok = flushLocked()
+        val outcome = flushLocked()
         prefs.lastSyncAttemptMs = System.currentTimeMillis()
-        prefs.lastSyncError = if (ok) "" else (api.lastSyncError ?: "no internet")
-        ok
+        prefs.lastSyncError = if (outcome.ok) "" else (outcome.error ?: "no internet")
+        outcome.ok
     }
 
-    private suspend fun flushLocked(): Boolean {
-        if (!prefs.isLoggedIn) return true
+    private suspend fun flushLocked(): FlushOutcome {
+        if (!prefs.isLoggedIn) return FlushOutcome(false, "signed out")
+        // The Remote phone never registers itself as a device and never uploads locations.
+        if (prefs.isRemote) return FlushOutcome(true)
         return try {
             if (!prefs.deviceRegistered) {
                 val name = "${Build.MANUFACTURER} ${Build.MODEL}".trim()
-                if (!api.registerDevice(prefs.deviceId, name)) return false
+                val reg = api.registerDevice(prefs.deviceId, name, prefs.userId)
+                if (!reg.ok) return FlushOutcome(false, reg.error)
                 prefs.deviceRegistered = true
             }
-            var allSent = true
+            val ownerId = prefs.userId
+            var ok = true
+            var error: String? = null
+            fun fail(e: String?) { ok = false; if (error == null) error = e }
+
+            // locations: one bad batch must not block the alerts behind it
             while (true) {
                 val batch = dao.next(100)
                 if (batch.isEmpty()) break
-                when (api.upload(batch.map { it.toDto(prefs.deviceId) })) {
+                val up = api.upload(batch.map { it.toDto(prefs.deviceId, ownerId) })
+                when (up.result) {
                     UploadResult.OK, UploadResult.REJECTED -> dao.delete(batch.map { it.id })
-                    UploadResult.RETRY -> { allSent = false; break }
+                    UploadResult.RETRY -> { fail(up.error); break }
                 }
             }
-            // alerts (tamper, theft, crash ...) go right after the locations
-            while (allSent) {
+            // alerts (tamper, theft, crash ...) upload even when the locations failed
+            while (true) {
                 val batch = events.next(50)
                 if (batch.isEmpty()) break
-                when (api.uploadEvents(batch.map { it.toDto(prefs.deviceId) })) {
+                val up = api.uploadEvents(batch.map { it.toDto(prefs.deviceId, ownerId) })
+                when (up.result) {
                     UploadResult.OK, UploadResult.REJECTED -> events.delete(batch.map { it.id })
-                    UploadResult.RETRY -> { allSent = false; break }
+                    UploadResult.RETRY -> { fail(up.error); break }
                 }
             }
             // mirror armed / odometer / limits to the server so the Viewer can show them
-            if (allSent && prefs.stateDirty) {
+            if (prefs.stateDirty) {
                 val patch = DeviceStatePatch(
                     armed = prefs.parkingArmed, trackingExpected = prefs.shouldTrack,
                     odometerKm = prefs.odometerKm.toDouble(),
                     nextServiceKm = prefs.nextServiceKm.takeIf { it > 0f }?.toDouble(),
                     speedLimitKmh = prefs.speedLimitKmh,
                 )
-                if (api.patchDeviceState(prefs.deviceId, patch)) prefs.stateDirty = false
+                val res = api.patchDeviceState(prefs.deviceId, patch)
+                if (res.ok) prefs.stateDirty = false else fail(res.error)
             }
-            allSent
+            FlushOutcome(ok, error)
         } catch (e: IOException) {
-            false
+            FlushOutcome(false, if (e is java.net.SocketTimeoutException) "timed out" else "no internet")
         }
     }
 }

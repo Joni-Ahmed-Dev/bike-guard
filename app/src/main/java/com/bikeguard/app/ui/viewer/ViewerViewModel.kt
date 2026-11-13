@@ -129,13 +129,17 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
                 val cid = app.api.sendCommand(id, type, arg)
                 if (cid == null) { commandNote = R.string.cmd_failed; return@launch }
                 commandNote = R.string.cmd_sent
-                if (type == "siren_on") sirenOn = true
-                if (type == "siren_off") sirenOn = false
                 repeat(12) {                          // wait up to ~36 s for the tracker to confirm
                     delay(3_000)
                     val st = try { app.api.commandStatus(cid) } catch (e: IOException) { null }
-                    if (st == "done") { commandNote = R.string.cmd_done; return@launch }
+                    if (st == "done") {
+                        // Only a confirmed command changes the siren state, never the send itself.
+                        if (type == "siren_on") sirenOn = true
+                        if (type == "siren_off") sirenOn = false
+                        commandNote = R.string.cmd_done; return@launch
+                    }
                 }
+                commandNote = R.string.cmd_failed // no confirmation within ~36 s
             } catch (e: IOException) {
                 commandNote = R.string.cmd_failed
             }

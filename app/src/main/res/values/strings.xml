@@ -103,6 +103,8 @@
     <string name="tab_alerts">Alerts</string>
     <string name="alerts_empty_title">All quiet</string>
     <string name="alerts_empty_body">Theft alerts, geofence crossings and ride events show up here.</string>
+    <string name="alerts_error_title">Couldn’t load alerts</string>
+    <string name="alerts_error_body">Check your connection and try again.</string>
     <string name="ev_motion">Motion detected</string>
     <string name="ev_moved">Bike is being moved!</string>
     <string name="ev_geofence_exit">Left %1$s</string>
@@ -203,6 +205,7 @@
     <string name="dash_alerts">Recent alerts</string>
     <string name="dash_health">Tracker health</string>
     <string name="dash_health_ok">Tracker phone is healthy</string>
+    <string name="dash_health_unknown">Unknown — no data from the tracker yet</string>
     <string name="dash_park_title">Where I parked</string>
     <string name="dash_park_none">No parking spot saved yet</string>
     <string name="dash_park_note">Note</string>
@@ -258,7 +261,9 @@
     <string name="sync_err_no_internet">No internet</string>
     <string name="sync_err_timeout">Timed out</string>
     <string name="sync_err_server">Server %1$s</string>
+    <string name="sync_err_signed_out">Signed out</string>
     <string name="sync_test">Test connection</string>
     <string name="sync_test_checking">Checking…</string>
     <string name="sync_test_ok">Connected — data uploaded</string>
+    <string name="sync_test_project">Project: %1$s</string>
 </resources>

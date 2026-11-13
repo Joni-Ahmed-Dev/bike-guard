@@ -84,9 +84,23 @@ class TrackingService : Service() {
         guard.start()
         scope.launch {
             for (signal in flushSignal) {
-                val ok = app.sync.flush()
-                TrackerState.online.value = ok
-                if (!ok) delay(10_000)
+                try {
+                    val ok = app.sync.flush()
+                    TrackerState.online.value = ok
+                    if (!ok) delay(10_000)
+                } catch (e: Exception) {
+                    // One bad exception (a crash in the queue, a bad row) must never kill uploads for good.
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    val reason = when (e) {
+                        is java.net.SocketTimeoutException -> "timed out"
+                        is IOException -> "no internet"
+                        else -> "sync error"
+                    }
+                    app.prefs.lastSyncError = reason
+                    app.prefs.lastSyncAttemptMs = System.currentTimeMillis()
+                    TrackerState.online.value = false
+                    delay(10_000)
+                }
             }
         }
         // Remote commands: poll every 15 s, or at once when a push wakes us.
@@ -284,6 +298,8 @@ class TrackingService : Service() {
         if (s.speedLimitKmh != p.speedLimitKmh) { p.speedLimitKmh = s.speedLimitKmh; p.stateDirty = true }
         if (s.guardArmed != p.parkingArmed) GuardControl.setArmed(this, s.guardArmed)
         if (s.autoArm != p.autoArm) p.autoArm = s.autoArm
+        if (s.sirenOnAlert != p.sirenOnAlert) p.sirenOnAlert = s.sirenOnAlert
+        if (s.sosSms != p.sosSms) p.sosSms = s.sosSms
         if (s.crashEnabled != p.crashDetection) p.crashDetection = s.crashEnabled
         if (s.sosNumber != p.emergencyNumber) p.emergencyNumber = s.sosNumber
         if (s.serviceKm != p.serviceIntervalKm) p.scheduleService(s.serviceKm)
@@ -305,6 +321,7 @@ class TrackingService : Service() {
                 deviceId = p.deviceId, mode = p.mode, intervalSec = p.intervalSec,
                 speedLimitKmh = p.speedLimitKmh, guardArmed = p.parkingArmed,
                 autoArm = p.autoArm,
+                sirenOnAlert = p.sirenOnAlert, sosSms = p.sosSms,
                 crashEnabled = p.crashDetection, sosNumber = p.emergencyNumber,
                 serviceKm = p.serviceIntervalKm,
                 guardScheduleStart = p.guardScheduleStart.takeIf { it in 0..23 },
@@ -326,8 +343,10 @@ class TrackingService : Service() {
         if (start !in 0..23 || end !in 0..23 || start == end) return
         val hour = LocalTime.now().hour
         val inside = if (start < end) hour in start until end else hour >= start || hour < end
-        if (inside && !p.parkingArmed) { GuardControl.setArmed(this, true); p.scheduleArmed = true }
-        else if (!inside && p.scheduleArmed) { GuardControl.setArmed(this, false); p.scheduleArmed = false }
+        // After a manual disarm the guard stays off for 10 minutes, even inside the window.
+        val latched = System.currentTimeMillis() - p.manualDisarmAtMs < DISARM_LATCH_MS
+        if (inside && !p.parkingArmed && !latched) { GuardControl.setArmed(this, true); p.scheduleArmed = true }
+        else if (!inside && p.scheduleArmed) { GuardControl.setArmed(this, false, latch = false); p.scheduleArmed = false }
     }
 
     /** Raises one health_warning event when the tracker's health changes for the worse. */
@@ -391,6 +410,8 @@ class TrackingService : Service() {
     companion object {
         private const val NOTIF_ID = 1001
         private const val MAX_QUEUE = 50_000
+        /** After a manual disarm, auto re-arm (and the guard schedule) waits this long. */
+        const val DISARM_LATCH_MS = 10 * 60_000L
         const val ACTION_POLL = "com.bikeguard.app.POLL_COMMANDS"
 
         /** Safe to call repeatedly; also re-applies a changed interval. Throws if Android forbids a background start. */

@@ -56,9 +56,9 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     // Local mirrors of the stored settings so the switches react instantly.
     // Keyed on the server row: when it loads, the screen shows the server's values.
     var autoArm by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.autoArm ?: prefs.autoArm) }
-    var siren by remember { mutableStateOf(prefs.sirenOnAlert) }
+    var siren by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.sirenOnAlert ?: prefs.sirenOnAlert) }
     var crash by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.crashEnabled ?: prefs.crashDetection) }
-    var sms by remember { mutableStateOf(prefs.sosSms) }
+    var sms by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.sosSms ?: prefs.sosSms) }
     var number by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.sosNumber ?: prefs.emergencyNumber) }
     var limit by remember(vm.remoteSettings) { mutableIntStateOf(vm.remoteSettings?.speedLimitKmh ?: prefs.speedLimitKmh) }
     var serviceEvery by remember(vm.remoteSettings) { mutableIntStateOf(vm.remoteSettings?.serviceKm ?: prefs.serviceIntervalKm) }
@@ -93,7 +93,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     }
     val smsPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         smsDenied = !ok
-        if (ok) { sms = true; prefs.sosSms = true }
+        if (ok) { sms = true; prefs.sosSms = true; vm.pushSettings() }
     }
     fun pickMode(m: String) {
         if (m == MODE_AUTO && !AutoMode.hasPermission(ctx)) activityPerm.launch(Manifest.permission.ACTIVITY_RECOGNITION)
@@ -135,8 +135,8 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             }
         }
 
-        // ---- tracker role: settings are view-only ----
-        if (isTracker) {
+        // ---- tracker role (and invite mode): settings are view-only ----
+        if (isTracker || vm.inviteCode != null) {
             Panel(Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.tracker_view_only), color = Palette.Ember, style = MaterialTheme.typography.bodyMedium)
             }
@@ -154,6 +154,8 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 ReadOnlyRow(stringResource(R.string.safety_number), number.ifBlank { stringResource(R.string.none) })
                 ReadOnlyRow(stringResource(R.string.set_service), if (serviceEvery == 0) stringResource(R.string.service_off) else stringResource(R.string.service_every, serviceEvery))
             }
+        }
+        if (isTracker) {
             Panel(Modifier.fillMaxWidth()) {
                 Button(
                     onClick = {
@@ -167,6 +169,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                             else when {
                                 err == "no internet" -> ctx.getString(R.string.sync_err_no_internet)
                                 err == "timed out" -> ctx.getString(R.string.sync_err_timeout)
+                                err == "signed out" -> ctx.getString(R.string.sync_err_signed_out)
                                 err.startsWith("server ") -> ctx.getString(R.string.sync_err_server, err.removePrefix("server ").trim())
                                 else -> ctx.getString(R.string.sync_err_no_internet)
                             }
@@ -179,10 +182,21 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                     Spacer(Modifier.height(8.dp))
                     Text(it, color = if (testOk) Palette.Signal else Palette.Danger, style = MaterialTheme.typography.bodyMedium)
                 }
+                Spacer(Modifier.height(8.dp))
+                // The Supabase project this build talks to, so it can be compared with the dashboard.
+                Text(
+                    stringResource(
+                        R.string.sync_test_project,
+                        runCatching { java.net.URI(BuildConfig.SUPABASE_URL).host }.getOrNull()
+                            .orEmpty().ifBlank { stringResource(R.string.none) },
+                    ),
+                    color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
+                )
             }
         }
 
-        if (!isTracker) {
+        // ---- editable settings: Remote only, and never while an invite code is set ----
+        if (isRemote && vm.inviteCode == null) {
         // ---- tracking mode ----
         Panel(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.set_mode), style = MaterialTheme.typography.titleMedium)
@@ -226,7 +240,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             Text(stringResource(R.string.set_guard), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             SwitchRow(stringResource(R.string.guard_auto), null, autoArm) { autoArm = it; prefs.autoArm = it; if (isRemote) vm.pushSettings() }
-            SwitchRow(stringResource(R.string.guard_siren), null, siren) { siren = it; prefs.sirenOnAlert = it }
+            SwitchRow(stringResource(R.string.guard_siren), null, siren) { siren = it; prefs.sirenOnAlert = it; vm.pushSettings() }
         }
 
         // ---- safety ----
@@ -275,7 +289,12 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             }
             if (serviceEvery > 0) {
                 Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = { prefs.markServiced(); next = prefs.nextServiceKm.toInt(); vm.pushSettings() }) {
+                OutlinedButton(onClick = {
+                    // On the Remote phone this must reach the bike as a command; only changing
+                    // this phone's prefs would silently do nothing.
+                    if (isRemote) vm.sendRemoteCommand("mark_serviced")
+                    else { prefs.markServiced(); next = prefs.nextServiceKm.toInt(); vm.pushSettings() }
+                }) {
                     Text(stringResource(R.string.service_mark))
                 }
             }
@@ -336,34 +355,43 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 }
             }
 
-            // ---- family view-only invite ----
+        }
+        } // end of editable settings (tracker role sees them read-only above)
+
+        // ---- family view-only invite: always shown while an invite code is set, even
+        // when no role is picked, so the code (and Remove invite) is never hidden ----
+        if (isRemote || vm.inviteCode != null) {
             Panel(Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.family_title), style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(4.dp))
                 Text(stringResource(R.string.family_desc), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(12.dp))
-                Button(onClick = { vm.createFamilyInvite { familyCode = it } }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.family_generate))
+                if (isRemote) {
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = { vm.createFamilyInvite { familyCode = it } }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.family_generate))
+                    }
+                    familyCode?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(stringResource(R.string.family_code, it), style = MaterialTheme.typography.titleMedium, color = Palette.Ember)
+                    }
                 }
-                familyCode?.let {
+                if (vm.inviteCode == null) {
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = inviteInput, onValueChange = { inviteInput = it.trim(); inviteSaved = false }, singleLine = true,
+                        label = { Text(stringResource(R.string.family_use)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     Spacer(Modifier.height(8.dp))
-                    Text(stringResource(R.string.family_code, it), style = MaterialTheme.typography.titleMedium, color = Palette.Ember)
-                }
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = inviteInput, onValueChange = { inviteInput = it.trim(); inviteSaved = false }, singleLine = true,
-                    label = { Text(stringResource(R.string.family_use)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
                         vm.updateInviteCode(inviteInput); inviteSaved = inviteInput.isNotBlank()
                     }) { Text(stringResource(R.string.add)) }
-                    if (vm.inviteCode != null) {
-                        OutlinedButton(onClick = { vm.clearInviteCode(); inviteInput = ""; inviteSaved = false }) {
-                            Text(stringResource(R.string.invite_clear))
-                        }
+                } else {
+                    Spacer(Modifier.height(12.dp))
+                    Text(stringResource(R.string.family_code, vm.inviteCode.orEmpty()), style = MaterialTheme.typography.titleMedium, color = Palette.Ember)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = { vm.clearInviteCode(); inviteInput = ""; inviteSaved = false }) {
+                        Text(stringResource(R.string.invite_clear))
                     }
                 }
                 if (inviteSaved) {
@@ -372,7 +400,6 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 }
             }
         }
-        } // end of editable settings (tracker role sees them read-only above)
 
         // ---- battery ----
         Panel(Modifier.fillMaxWidth()) {

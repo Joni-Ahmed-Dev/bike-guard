@@ -24,9 +24,11 @@ import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,12 +46,14 @@ import com.bikeguard.app.ui.agoText
 import com.bikeguard.app.ui.rememberNow
 import com.bikeguard.app.ui.theme.Palette
 import com.bikeguard.app.ui.theme.Panel
+import kotlinx.coroutines.launch
 
 @Composable
 fun AlertsScreen(modifier: Modifier, vm: AlertsViewModel) {
     val ctx = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val now = rememberNow()
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { vm.refresh(); vm.markSeen() }
     LaunchedEffect(Unit) { owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { vm.live() } }
@@ -59,7 +63,16 @@ fun AlertsScreen(modifier: Modifier, vm: AlertsViewModel) {
             stringResource(R.string.tab_alerts), style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(top = 16.dp, bottom = 12.dp),
         )
-        if (vm.loaded && vm.events.isEmpty()) {
+        if (vm.error) {
+            // The load failed: say so and offer a retry, instead of pretending all is quiet.
+            Panel(Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.alerts_error_title), style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.height(6.dp))
+                Text(stringResource(R.string.alerts_error_body), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(onClick = { scope.launch { vm.refresh() } }) { Text(stringResource(R.string.retry)) }
+            }
+        } else if (vm.loaded && vm.events.isEmpty()) {
             Panel(Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.alerts_empty_title), style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(6.dp))

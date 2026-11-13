@@ -38,33 +38,29 @@ class SupabaseApi(private val prefs: Prefs) {
     /** Flips to true when the refresh token is rejected, so the UI can send the user back to sign-in. */
     val sessionExpired = MutableStateFlow(false)
 
-    /** Last upload failure reason: "no internet", "timed out" or "server <code>"; null when the last call worked. */
-    var lastSyncError: String? = null
-        private set
-
     val isConfigured get() = BuildConfig.SUPABASE_URL.startsWith("http") && BuildConfig.SUPABASE_ANON_KEY.isNotBlank()
 
-    private class Resp(val code: Int, val body: String) { val ok get() = code in 200..299 }
+    /** One call's outcome: whether it worked, and the local failure reason when it did not. */
+    data class ApiResult(val ok: Boolean, val error: String? = null)
+    /** An upload's outcome: the queue decision, and the local failure reason when it must retry. */
+    data class UploadOutcome(val result: UploadResult, val error: String? = null)
+
+    private class Resp(val code: Int, val body: String) {
+        val ok get() = code in 200..299
+        val error: String? get() = if (ok) null else "server $code"
+    }
 
     private fun builder(path: String, token: String?) = Request.Builder()
         .url(base + path)
         .header("apikey", BuildConfig.SUPABASE_ANON_KEY)
         .header("Authorization", "Bearer " + (token ?: BuildConfig.SUPABASE_ANON_KEY))
 
+    /** Local reason for an IOException, so the caller can report it without a shared mutable field. */
+    private fun ioReason(e: IOException): String =
+        if (e is java.net.SocketTimeoutException) "timed out" else "no internet"
+
     private suspend fun exec(r: Request): Resp = withContext(Dispatchers.IO) {
-        try {
-            http.newCall(r).execute().use { resp ->
-                val out = Resp(resp.code, resp.body?.string().orEmpty())
-                lastSyncError = if (out.ok) null else "server ${out.code}"
-                out
-            }
-        } catch (e: java.net.SocketTimeoutException) {
-            lastSyncError = "timed out"
-            throw e
-        } catch (e: IOException) {
-            lastSyncError = "no internet"
-            throw e
-        }
+        http.newCall(r).execute().use { resp -> Resp(resp.code, resp.body?.string().orEmpty()) }
     }
 
     private suspend fun authed(make: (String) -> Request): Resp {
@@ -120,15 +116,17 @@ class SupabaseApi(private val prefs: Prefs) {
 
     // ---------- devices ----------
 
-    suspend fun registerDevice(id: String, name: String): Boolean {
-        val payload = json.encodeToString(DeviceDto.serializer(), DeviceDto(id = id, name = name))
+    suspend fun registerDevice(id: String, name: String, ownerId: String? = null): ApiResult = try {
+        val payload = json.encodeToString(
+            DeviceDto.serializer(), DeviceDto(id = id, name = name, ownerId = ownerId)
+        )
         val r = authed {
             builder("/rest/v1/devices?on_conflict=id", it)
                 .header("Prefer", "resolution=ignore-duplicates,return=minimal")
                 .post(payload.toRequestBody(jsonType)).build()
         }
-        return r.ok
-    }
+        ApiResult(r.ok, r.error)
+    } catch (e: IOException) { ApiResult(false, ioReason(e)) }
 
     /** Throws IOException when offline; returns null on an HTTP error. */
     suspend fun listDevices(): List<DeviceDto>? {
@@ -138,7 +136,7 @@ class SupabaseApi(private val prefs: Prefs) {
 
     // ---------- locations ----------
 
-    suspend fun upload(items: List<LocationDto>): UploadResult = try {
+    suspend fun upload(items: List<LocationDto>): UploadOutcome = try {
         val payload = json.encodeToString(ListSerializer(LocationDto.serializer()), items)
         val r = authed {
             builder("/rest/v1/locations?on_conflict=device_id,recorded_at", it)
@@ -146,12 +144,12 @@ class SupabaseApi(private val prefs: Prefs) {
                 .post(payload.toRequestBody(jsonType)).build()
         }
         when {
-            r.ok -> UploadResult.OK
-            r.code == 409 -> { prefs.deviceRegistered = false; UploadResult.RETRY } // device row missing: re-register
-            r.code == 400 || r.code == 422 -> UploadResult.REJECTED                 // malformed: never succeeds, drop it
-            else -> UploadResult.RETRY
+            r.ok -> UploadOutcome(UploadResult.OK)
+            r.code == 409 || r.code == 403 -> { prefs.deviceRegistered = false; UploadOutcome(UploadResult.RETRY, r.error) } // device row missing or forbidden: re-register
+            r.code == 400 || r.code == 422 -> UploadOutcome(UploadResult.REJECTED, r.error) // malformed: never succeeds, drop it
+            else -> UploadOutcome(UploadResult.RETRY, r.error)
         }
-    } catch (e: IOException) { UploadResult.RETRY }
+    } catch (e: IOException) { UploadOutcome(UploadResult.RETRY, ioReason(e)) }
 
     /** Newest first. Throws IOException when offline; returns null on an HTTP error. */
     suspend fun recent(deviceId: String, limit: Int): List<LocationDto>? {
@@ -192,15 +190,16 @@ class SupabaseApi(private val prefs: Prefs) {
 
     // ---------- device state, events, commands (Phase 3) ----------
 
-    suspend fun patchDeviceState(deviceId: String, patch: DeviceStatePatch): Boolean = try {
+    suspend fun patchDeviceState(deviceId: String, patch: DeviceStatePatch): ApiResult = try {
         val payload = json.encodeToString(DeviceStatePatch.serializer(), patch)
-        authed {
+        val r = authed {
             builder("/rest/v1/devices?id=eq.$deviceId", it)
                 .header("Prefer", "return=minimal").patch(payload.toRequestBody(jsonType)).build()
-        }.ok
-    } catch (e: IOException) { false }
+        }
+        ApiResult(r.ok, r.error)
+    } catch (e: IOException) { ApiResult(false, ioReason(e)) }
 
-    suspend fun uploadEvents(items: List<EventDto>): UploadResult = try {
+    suspend fun uploadEvents(items: List<EventDto>): UploadOutcome = try {
         val payload = json.encodeToString(ListSerializer(EventDto.serializer()), items)
         val r = authed {
             builder("/rest/v1/events?on_conflict=device_id,type,created_at", it)
@@ -208,12 +207,12 @@ class SupabaseApi(private val prefs: Prefs) {
                 .post(payload.toRequestBody(jsonType)).build()
         }
         when {
-            r.ok -> UploadResult.OK
-            r.code == 409 -> { prefs.deviceRegistered = false; UploadResult.RETRY }
-            r.code == 400 || r.code == 422 -> UploadResult.REJECTED
-            else -> UploadResult.RETRY
+            r.ok -> UploadOutcome(UploadResult.OK)
+            r.code == 409 || r.code == 403 -> { prefs.deviceRegistered = false; UploadOutcome(UploadResult.RETRY, r.error) }
+            r.code == 400 || r.code == 422 -> UploadOutcome(UploadResult.REJECTED, r.error)
+            else -> UploadOutcome(UploadResult.RETRY, r.error)
         }
-    } catch (e: IOException) { UploadResult.RETRY }
+    } catch (e: IOException) { UploadOutcome(UploadResult.RETRY, ioReason(e)) }
 
     suspend fun listEvents(limit: Int = 100): List<EventDto>? {
         val r = authed { builder("/rest/v1/events?select=*&order=created_at.desc&limit=$limit", it).get().build() }
@@ -323,6 +322,8 @@ class SupabaseApi(private val prefs: Prefs) {
             put("speed_limit_kmh", dto.speedLimitKmh)
             put("guard_armed", dto.guardArmed)
             put("auto_arm", dto.autoArm)
+            put("siren_on_alert", dto.sirenOnAlert)
+            put("sos_sms", dto.sosSms)
             put("crash_enabled", dto.crashEnabled)
             put("sos_number", dto.sosNumber)
             put("service_km", dto.serviceKm)

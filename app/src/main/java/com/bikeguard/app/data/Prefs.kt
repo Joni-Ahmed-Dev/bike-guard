@@ -164,6 +164,11 @@ class Prefs(context: Context) {
         get() = sp.getString("health_state", "") ?: ""
         set(v) = sp.edit { putString("health_state", v) }
 
+    /** When the guard was last disarmed by hand, in millis since epoch; 0 = never. Auto re-arm waits 10 minutes after this. */
+    var manualDisarmAtMs: Long
+        get() = sp.getLong("disarm_at_ms", 0L)
+        set(v) = sp.edit { putLong("disarm_at_ms", v) }
+
     val isTracker: Boolean get() = appRole == ROLE_TRACKER
     val isRemote: Boolean get() = appRole == ROLE_REMOTE
     val isInviteMode: Boolean get() = !viewerInviteCode.isNullOrBlank()
@@ -172,9 +177,10 @@ class Prefs(context: Context) {
     /** The Remote phone never tracks, even if an old install left tracking prefs behind. */
     val shouldTrack: Boolean get() = isLoggedIn && !isRemote && (trackingActive || mode == MODE_ALWAYS || parkingArmed)
 
+    /** Signs out but keeps this phone's device identity, so a re-login uploads under the same device. */
     fun clearSession() = sp.edit {
         remove("at"); remove("rt"); remove("uid"); remove("email")
-        remove("device_id"); putBoolean("device_registered", false); putBoolean("tracking_active", false)
+        putBoolean("tracking_active", false)
         putBoolean("armed", false); putBoolean("state_dirty", true)
         remove("invite_code")
     }

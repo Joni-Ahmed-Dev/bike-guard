@@ -115,7 +115,8 @@ class Guard(private val ctx: Context, private val app: BikeGuardApp) : SensorGua
                     if (prefs.sirenOnAlert) SirenPlayer.start(ctx, 30)
                 }
             }
-        } else if (prefs.autoArm && stationaryFor >= 5 * 60_000L && !isLive()) {
+        } else if (prefs.autoArm && stationaryFor >= 5 * 60_000L && !isLive()
+            && System.currentTimeMillis() - prefs.manualDisarmAtMs >= TrackingService.DISARM_LATCH_MS) {
             GuardControl.setArmed(ctx, true)
             // The owner is told the guard armed itself; movement while armed never disarms.
             raise("auto_armed", "info")

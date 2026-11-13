@@ -48,7 +48,7 @@ async function rpc(fn) {
   return r.json();
 }
 
-const map = new maplibregl.Map({ container: "map", style: "https://tiles.openfreemap.org/styles/dark", center: [90.4, 23.7], zoom: 5 });
+const map = new maplibregl.Map({ container: "map", style: "https://tiles.openfreemap.org/styles/bright", center: [90.4, 23.7], zoom: 5 });
 const el = document.createElement("div"); el.className = "pin";
 const marker = new maplibregl.Marker({ element: el });
 let placed = false, ready = false;

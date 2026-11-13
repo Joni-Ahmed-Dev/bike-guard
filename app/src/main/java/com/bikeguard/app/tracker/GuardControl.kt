@@ -8,11 +8,16 @@ import kotlinx.serialization.json.JsonObject
 
 /** Entry points shared by the service, the UI, the widget and FCM handlers. */
 object GuardControl {
-    fun setArmed(ctx: Context, on: Boolean) {
+    /**
+     * [latch] records a manual disarm, so auto re-arm waits 10 minutes. The guard schedule's
+     * own window-end disarm passes latch = false, so it never blocks the next window.
+     */
+    fun setArmed(ctx: Context, on: Boolean, latch: Boolean = true) {
         val app = ctx.bikeApp
         app.prefs.parkingArmed = on
         app.prefs.stateDirty = true
         TrackerState.armed.value = on
+        if (!on && latch) app.prefs.manualDisarmAtMs = System.currentTimeMillis()
         if (on) { app.prefs.trackingActive = true; ctx.tryStartTracking() }
         app.appScope.launch { app.sync.flush() }   // tell the server right away when online
     }
@@ -44,6 +49,8 @@ object GuardControl {
 object TrackingControl {
     fun set(ctx: Context, on: Boolean) {
         val prefs = ctx.bikeApp.prefs
+        // The Remote phone never tracks: the widget and tile refuse to start it here.
+        if (on && prefs.isRemote) return
         if (!on && prefs.mode == com.bikeguard.app.data.MODE_ALWAYS) return // Always-on cannot be switched off from here
         prefs.trackingActive = on
         if (on) {

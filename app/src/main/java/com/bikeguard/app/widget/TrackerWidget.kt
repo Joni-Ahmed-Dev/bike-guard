@@ -23,7 +23,10 @@ class TrackerWidget : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == ACTION_TOGGLE) {
-            if (context.bikeApp.prefs.isLoggedIn) TrackingControl.set(context, !TrackerState.running.value)
+            // The Remote phone never tracks: the widget does nothing there.
+            if (context.bikeApp.prefs.isLoggedIn && !context.bikeApp.prefs.isRemote) {
+                TrackingControl.set(context, !TrackerState.running.value)
+            }
             update(context)
         }
     }

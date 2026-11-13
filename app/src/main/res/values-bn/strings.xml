@@ -103,6 +103,8 @@
     <string name="tab_alerts">সতর্কতা</string>
     <string name="alerts_empty_title">সব শান্ত</string>
     <string name="alerts_empty_body">চুরির সতর্কতা, জিওফেন্স পার ও রাইডের ইভেন্ট এখানে দেখা যাবে।</string>
+    <string name="alerts_error_title">অ্যালার্ট লোড করা যায়নি</string>
+    <string name="alerts_error_body">সংযোগ দেখে আবার চেষ্টা করো।</string>
     <string name="ev_motion">নড়াচড়া শনাক্ত হয়েছে</string>
     <string name="ev_moved">বাইক সরানো হচ্ছে!</string>
     <string name="ev_geofence_exit">%1$s থেকে বেরিয়েছে</string>
@@ -203,6 +205,7 @@
     <string name="dash_alerts">সাম্প্রতিক সতর্কতা</string>
     <string name="dash_health">ট্র্যাকার ফোনের অবস্থা</string>
     <string name="dash_health_ok">ট্র্যাকার ফোন ঠিক আছে</string>
+    <string name="dash_health_unknown">জানা যায়নি — ট্র্যাকার থেকে এখনো কোনো ডাটা আসেনি</string>
     <string name="dash_park_title">কোথায় পার্ক করলাম</string>
     <string name="dash_park_none">এখনও পার্কিংয়ের জায়গা জমা হয়নি</string>
     <string name="dash_park_note">নোট</string>
@@ -258,7 +261,9 @@
     <string name="sync_err_no_internet">ইন্টারনেট নেই</string>
     <string name="sync_err_timeout">সময় শেষ হয়ে গেছে</string>
     <string name="sync_err_server">সার্ভার %1$s</string>
+    <string name="sync_err_signed_out">সাইন আউট করা হয়েছে</string>
     <string name="sync_test">সংযোগ পরীক্ষা করুন</string>
     <string name="sync_test_checking">পরীক্ষা করা হচ্ছে…</string>
     <string name="sync_test_ok">সংযোগ হয়েছে, ডাটা আপলোড হয়েছে</string>
+    <string name="sync_test_project">প্রকল্প: %1$s</string>
 </resources>

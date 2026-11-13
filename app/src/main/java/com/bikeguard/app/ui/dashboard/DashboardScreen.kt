@@ -19,6 +19,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bikeguard.app.R
 import com.bikeguard.app.bikeApp
@@ -53,9 +56,15 @@ fun DashboardScreen(
     alerts: AlertsViewModel = viewModel(),
 ) {
     val ctx = LocalContext.current
+    val owner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val now = rememberNow()
     LaunchedEffect(Unit) { tripsVm.load(); alerts.refresh(); vm.loadGeofences() }
+    // The Dashboard is the Remote phone's default tab: start the live poll here too, so it
+    // shows live data without opening the Viewer first.
+    LaunchedEffect(Unit) {
+        owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { vm.pollLoop() }
+    }
 
     val latest = vm.latest
     val device = vm.selectedDevice
@@ -194,7 +203,11 @@ fun DashboardScreen(
         Panel(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.dash_health), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(6.dp))
-            if (healthBad && healthEvent != null) {
+            // No device, or no location ever received: the health is unknown, never "healthy".
+            val hasData = device != null && latest != null
+            if (!hasData) {
+                Text(stringResource(R.string.dash_health_unknown), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+            } else if (healthBad && healthEvent != null) {
                 Text(eventTitle(ctx, healthEvent.type, healthEvent.data?.toString()), color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
                 Text(agoText(ctx, healthEvent.createdMs, now), color = Palette.Muted, style = MaterialTheme.typography.labelMedium)
             } else {

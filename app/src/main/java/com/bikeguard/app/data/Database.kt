@@ -27,8 +27,8 @@ data class PendingLocation(
     val charging: Boolean?,
     val recordedAt: Long,
 ) {
-    fun toDto(deviceId: String) = LocationDto(
-        deviceId = deviceId, lat = lat, lng = lng, speed = speed, bearing = bearing,
+    fun toDto(deviceId: String, ownerId: String? = null) = LocationDto(
+        deviceId = deviceId, ownerId = ownerId, lat = lat, lng = lng, speed = speed, bearing = bearing,
         accuracy = accuracy, battery = battery, isCharging = charging,
         recordedAt = Instant.ofEpochMilli(recordedAt).toString()
     )
@@ -67,8 +67,8 @@ data class PendingEvent(
     val data: String?,
     val createdAt: Long,
 ) {
-    fun toDto(deviceId: String) = EventDto(
-        deviceId = deviceId, type = type, severity = severity, lat = lat, lng = lng,
+    fun toDto(deviceId: String, ownerId: String? = null) = EventDto(
+        deviceId = deviceId, ownerId = ownerId, type = type, severity = severity, lat = lat, lng = lng,
         data = data?.let { runCatching { kotlinx.serialization.json.Json.parseToJsonElement(it) }.getOrNull() },
         createdAt = Instant.ofEpochMilli(createdAt).toString()
     )

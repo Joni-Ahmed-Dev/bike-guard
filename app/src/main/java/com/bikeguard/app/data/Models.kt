@@ -19,6 +19,7 @@ data class AuthResponse(
 data class DeviceDto(
     val id: String? = null,
     val name: String,
+    @SerialName("owner_id") val ownerId: String? = null,
     @SerialName("last_seen") val lastSeen: String? = null,
     val armed: Boolean? = null,
     @SerialName("odometer_km") val odometerKm: Double? = null,
@@ -39,6 +40,7 @@ data class DeviceStatePatch(
 @Serializable
 data class LocationDto(
     @SerialName("device_id") val deviceId: String,
+    @SerialName("owner_id") val ownerId: String? = null,
     val lat: Double,
     val lng: Double,
     val speed: Float? = null,
@@ -91,6 +93,7 @@ data class PointDto(
 data class EventDto(
     val id: Long? = null,
     @SerialName("device_id") val deviceId: String,
+    @SerialName("owner_id") val ownerId: String? = null,
     val type: String,
     val severity: String = "info",
     val lat: Double? = null,
@@ -141,6 +144,8 @@ data class DeviceSettingsDto(
     @SerialName("speed_limit_kmh") val speedLimitKmh: Int = 0,
     @SerialName("guard_armed") val guardArmed: Boolean = false,
     @SerialName("auto_arm") val autoArm: Boolean = false,
+    @SerialName("siren_on_alert") val sirenOnAlert: Boolean = false,
+    @SerialName("sos_sms") val sosSms: Boolean = false,
     @SerialName("crash_enabled") val crashEnabled: Boolean = true,
     @SerialName("sos_number") val sosNumber: String = "",
     @SerialName("service_km") val serviceKm: Int = 0,
