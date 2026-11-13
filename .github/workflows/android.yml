@@ -34,10 +34,13 @@ jobs:
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json; fi
       - name: Decode release keystore
         env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_B64_A: ${{ secrets.KEYSTORE_B64_A }}
+          KEYSTORE_B64_B: ${{ secrets.KEYSTORE_B64_B }}
+          KEYSTORE_B64_C: ${{ secrets.KEYSTORE_B64_C }}
+          KEYSTORE_B64_D: ${{ secrets.KEYSTORE_B64_D }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then echo "$KEYSTORE_BASE64" | base64 -d > app/keystore.jks; fi
+          echo "${KEYSTORE_B64_A}${KEYSTORE_B64_B}${KEYSTORE_B64_C}${KEYSTORE_B64_D}" | base64 -d > app/keystore.jks
           ls -l app/keystore.jks
           keytool -list -keystore app/keystore.jks -storepass "$KEYSTORE_PASSWORD" || echo KEYSTORE_LIST_FAILED
       - name: Build release APK
