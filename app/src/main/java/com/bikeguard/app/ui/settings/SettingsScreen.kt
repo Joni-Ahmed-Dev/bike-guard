@@ -325,7 +325,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
-                        vm.setInviteCode(inviteInput); inviteSaved = inviteInput.isNotBlank()
+                        vm.updateInviteCode(inviteInput); inviteSaved = inviteInput.isNotBlank()
                     }) { Text(stringResource(R.string.add)) }
                     if (vm.inviteCode != null) {
                         OutlinedButton(onClick = { vm.clearInviteCode(); inviteInput = ""; inviteSaved = false }) {

@@ -108,7 +108,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         return true
     }
 
-    fun setInviteCode(code: String) {
+    fun updateInviteCode(code: String) {
         val c = code.trim()
         app.prefs.viewerInviteCode = c.ifBlank { null }
         inviteCode = app.prefs.viewerInviteCode

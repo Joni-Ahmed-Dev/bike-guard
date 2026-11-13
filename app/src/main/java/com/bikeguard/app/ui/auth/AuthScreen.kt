@@ -97,7 +97,7 @@ fun AuthScreen(vm: AppViewModel) {
             Spacer(Modifier.height(24.dp))
             Button(
                 onClick = {
-                    if (invite.isNotBlank()) vm.setInviteCode(invite)
+                    if (invite.isNotBlank()) vm.updateInviteCode(invite)
                     vm.submit(email, password, signUp)
                 },
                 enabled = canSubmit,
