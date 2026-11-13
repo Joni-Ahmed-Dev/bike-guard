@@ -6,7 +6,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -23,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -42,7 +46,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bikeguard.app.R
 import com.bikeguard.app.bikeApp
 import com.bikeguard.app.data.MODE_ALWAYS
+import com.bikeguard.app.data.MODE_AUTO
 import com.bikeguard.app.data.Perms
+import com.bikeguard.app.tracker.GuardControl
 import com.bikeguard.app.tracker.TrackerState
 import com.bikeguard.app.ui.AppViewModel
 import com.bikeguard.app.ui.agoText
@@ -69,6 +75,8 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     val running by TrackerState.running.collectAsStateWithLifecycle()
     val online by TrackerState.online.collectAsStateWithLifecycle()
     val fix by TrackerState.lastFix.collectAsStateWithLifecycle()
+    val parked by TrackerState.parked.collectAsStateWithLifecycle()
+    val armed by TrackerState.armed.collectAsStateWithLifecycle()
     val queued by ctx.bikeApp.db.pending().count().collectAsStateWithLifecycle(0)
     val now = rememberNow()
     val always = vm.mode == MODE_ALWAYS
@@ -79,7 +87,9 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     ) {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.align(Alignment.Start))
         val (stateText, stateColor) = when {
+            !running && vm.mode == MODE_AUTO -> R.string.state_auto_waiting to Palette.Muted
             !running -> R.string.state_stopped to Palette.Muted
+            running && online && parked -> R.string.state_parked to Palette.Signal
             online -> R.string.state_live to Palette.Signal
             else -> R.string.state_offline to Palette.Ember
         }
@@ -97,13 +107,29 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             val haptic = LocalHapticFeedback.current
             StatusRing(
                 running = running, offline = running && !online, always = always,
+                idleLabel = if (vm.mode == MODE_AUTO) R.string.ring_auto_wait else R.string.ring_start,
                 onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); vm.setTracking(!running) },
             )
             if (always) {
                 Spacer(Modifier.height(12.dp))
                 Text(stringResource(R.string.always_hint), color = Palette.Muted, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
+            Panel(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.guard_parking), style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(2.dp))
+                        Text(stringResource(R.string.guard_parking_desc), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = armed, onCheckedChange = { GuardControl.setArmed(ctx, it) },
+                        colors = SwitchDefaults.colors(checkedTrackColor = Palette.Ember, checkedThumbColor = Palette.Ink),
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StatCard(stringResource(R.string.stat_last_fix), fix?.let { agoText(ctx, it.timeMs, now) } ?: stringResource(R.string.none), Modifier.weight(1f))
                 StatCard(stringResource(R.string.stat_speed), fix?.let { stringResource(R.string.unit_kmh, it.speedKmh.toInt()) } ?: stringResource(R.string.none), Modifier.weight(1f))
@@ -113,6 +139,8 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 StatCard(stringResource(R.string.stat_accuracy), fix?.let { stringResource(R.string.unit_m, it.accuracy.toInt()) } ?: stringResource(R.string.none), Modifier.weight(1f))
                 StatCard(stringResource(R.string.stat_queued), stringResource(R.string.unit_points, queued), Modifier.weight(1f), highlight = queued > 5)
             }
+            Spacer(Modifier.height(16.dp))
+            SosButton { GuardControl.sos(ctx) }
             if (!batteryOk) {
                 Spacer(Modifier.height(16.dp))
                 Panel(Modifier.fillMaxWidth()) {
@@ -128,7 +156,7 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun StatusRing(running: Boolean, offline: Boolean, always: Boolean, onClick: () -> Unit) {
+private fun StatusRing(running: Boolean, offline: Boolean, always: Boolean, idleLabel: Int, onClick: () -> Unit) {
     val color by animateColorAsState(
         when { !running -> Palette.Muted; offline -> Palette.Ember; else -> Palette.Signal }, label = "ringColor"
     )
@@ -162,7 +190,7 @@ private fun StatusRing(running: Boolean, offline: Boolean, always: Boolean, onCl
             Icon(Icons.Default.PowerSettingsNew, null, tint = color, modifier = Modifier.size(44.dp))
             Spacer(Modifier.height(8.dp))
             Text(
-                stringResource(when { always -> R.string.ring_always; running -> R.string.ring_tracking; else -> R.string.ring_start }),
+                stringResource(when { always -> R.string.ring_always; running -> R.string.ring_tracking; else -> idleLabel }),
                 color = if (running) Palette.Text else Palette.Muted, style = MaterialTheme.typography.titleMedium,
             )
         }
@@ -230,5 +258,29 @@ private fun PermissionStepCard(tick: Int, onChanged: () -> Unit) {
             },
             shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(52.dp),
         ) { Text(stringResource(R.string.grant)) }
+    }
+}
+
+/** Long-press on purpose: a stray tap must never send an SOS. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SosButton(onTrigger: () -> Unit) {
+    var sent by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
+    val shape = RoundedCornerShape(16.dp)
+    Surface(
+        shape = shape, color = Palette.Danger.copy(alpha = 0.14f),
+        border = BorderStroke(1.dp, Palette.Danger.copy(alpha = 0.5f)),
+        modifier = Modifier.fillMaxWidth().clip(shape).combinedClickable(
+            onClick = {},
+            onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onTrigger(); sent = true },
+        ),
+    ) {
+        Box(Modifier.padding(16.dp), contentAlignment = Alignment.Center) {
+            Text(
+                stringResource(if (sent) R.string.sos_sent else R.string.sos_hold),
+                color = Palette.Danger, style = MaterialTheme.typography.titleMedium,
+            )
+        }
     }
 }

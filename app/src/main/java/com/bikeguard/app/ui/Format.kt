@@ -9,6 +9,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import com.bikeguard.app.R
 import kotlinx.coroutines.delay
+import java.text.DateFormat
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 fun agoText(ctx: Context, thenMs: Long, nowMs: Long): String {
     val s = ((nowMs - thenMs) / 1000).coerceAtLeast(0)
@@ -35,3 +39,14 @@ fun openBatterySettings(ctx: Context) {
         runCatching { ctx.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
     }
 }
+
+fun fmtKm(ctx: Context, meters: Double): String = ctx.getString(R.string.unit_km, meters / 1000.0)
+
+fun fmtDuration(ctx: Context, ms: Long): String {
+    val min = (ms / 60_000).coerceAtLeast(1)
+    return if (min >= 60) ctx.getString(R.string.dur_hm, min / 60, min % 60) else ctx.getString(R.string.dur_m, min)
+}
+
+fun fmtDate(ms: Long): String = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(ms))
+fun fmtTime(ms: Long): String = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(ms))
+fun fmtClock(ms: Long): String = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(ms))

@@ -11,6 +11,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -85,6 +87,7 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
             SheetContent(
                 ctx = ctx, now = now, latest = latest, status = status, deviceName = deviceName,
                 loading = !vm.loaded && vm.selectedId != null, noDevice = vm.devicesLoaded && vm.devices.isEmpty(),
+                vm = vm,
             )
         },
     ) { _ ->
@@ -138,8 +141,9 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
 @Composable
 private fun SheetContent(
     ctx: Context, now: Long, latest: LocationDto?, status: Status, deviceName: String, loading: Boolean, noDevice: Boolean,
+    vm: ViewerViewModel,
 ) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
         when {
             noDevice -> {
                 Text(stringResource(R.string.viewer_no_device_title), style = MaterialTheme.typography.titleLarge)
@@ -182,6 +186,22 @@ private fun SheetContent(
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.navigate), fontWeight = FontWeight.SemiBold)
                 }
+                vm.selectedDevice?.let { d ->
+                    val odo = d.odometerKm ?: 0.0
+                    if (odo > 0) {
+                        val svc = d.nextServiceKm?.takeIf { it > 0 }?.let { n ->
+                            val left = (n - odo).toInt()
+                            if (left >= 0) stringResource(R.string.service_in, left) else stringResource(R.string.service_overdue)
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            listOfNotNull(stringResource(R.string.odo_line, odo.toInt()), svc).joinToString("  ·  "),
+                            color = Palette.Muted, style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                ViewerControls(vm)
             }
         }
     }

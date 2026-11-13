@@ -56,14 +56,49 @@ interface PendingDao {
     suspend fun clear()
 }
 
-@Database(entities = [PendingLocation::class], version = 1, exportSchema = false)
+/** An alert waiting to be uploaded (airplane mode, GPS off, theft motion, crash ...). Survives being offline. */
+@Entity(tableName = "pending_events", indices = [Index(value = ["type", "createdAt"], unique = true)])
+data class PendingEvent(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val type: String,
+    val severity: String,
+    val lat: Double?,
+    val lng: Double?,
+    val data: String?,
+    val createdAt: Long,
+) {
+    fun toDto(deviceId: String) = EventDto(
+        deviceId = deviceId, type = type, severity = severity, lat = lat, lng = lng,
+        data = data?.let { runCatching { kotlinx.serialization.json.Json.parseToJsonElement(it) }.getOrNull() },
+        createdAt = Instant.ofEpochMilli(createdAt).toString()
+    )
+}
+
+@Dao
+interface EventDao {
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(e: PendingEvent): Long
+
+    @Query("SELECT * FROM pending_events ORDER BY createdAt ASC LIMIT :n")
+    suspend fun next(n: Int): List<PendingEvent>
+
+    @Query("DELETE FROM pending_events WHERE id IN (:ids)")
+    suspend fun delete(ids: List<Long>)
+
+    @Query("DELETE FROM pending_events")
+    suspend fun clear()
+}
+
+@Database(entities = [PendingLocation::class, PendingEvent::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun pending(): PendingDao
+    abstract fun events(): EventDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "bikeguard.db")
+                .fallbackToDestructiveMigration() // v1 -> v2: only an unsent queue is lost
                 .build().also { instance = it }
         }
     }

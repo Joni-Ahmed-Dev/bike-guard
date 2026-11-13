@@ -40,9 +40,9 @@ import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 
 /** OpenStreetMap data via OpenFreeMap (free, no API key). Other styles: liberty, dark, positron, fiord. */
-private const val MAP_STYLE = "https://tiles.openfreemap.org/styles/bright"
-private const val SIGNAL = "#3DDBD9"
-private const val EMBER = "#FF9F1C"
+internal const val MAP_STYLE = "https://tiles.openfreemap.org/styles/bright"
+internal const val SIGNAL = "#3DDBD9"
+internal const val EMBER = "#FF9F1C"
 
 @Composable
 fun BikeMap(
@@ -153,7 +153,7 @@ fun BikeMap(
     }
 }
 
-private fun bikeFeature(p: LatLng, bearing: Float, moving: Boolean): Feature =
+internal fun bikeFeature(p: LatLng, bearing: Float, moving: Boolean): Feature =
     Feature.fromGeometry(Point.fromLngLat(p.longitude, p.latitude)).apply {
         addNumberProperty("bearing", bearing)
         addNumberProperty("moving", if (moving) 1 else 0)
@@ -185,7 +185,7 @@ private fun addLayers(style: Style) {
 }
 
 /** Heading marker: a small triangle at the top of a transparent 64px square, so it orbits the dot as it rotates. */
-private fun arrowBitmap(): Bitmap {
+internal fun arrowBitmap(): Bitmap {
     val bmp = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
     val c = Canvas(bmp)
     val path = Path().apply { moveTo(32f, 2f); lineTo(43f, 21f); lineTo(21f, 21f); close() }

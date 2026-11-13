@@ -8,6 +8,9 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// Push alerts need Firebase; the build works without it (push is simply skipped).
+if (file("google-services.json").exists()) apply(plugin = "com.google.gms.google-services")
+
 val localProps = Properties().apply {
     val f = rootProject.file("local.properties")
     if (f.exists()) f.inputStream().use { load(it) }
@@ -22,9 +25,10 @@ android {
         applicationId = "com.bikeguard.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "1.0.0"
         buildConfigField("String", "SUPABASE_URL", "\"${cfg("SUPABASE_URL")}\"")
+        buildConfigField("String", "SHARE_BASE_URL", "\"${cfg("SHARE_BASE_URL")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${cfg("SUPABASE_ANON_KEY")}\"")
     }
 
@@ -86,4 +90,8 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     implementation("org.maplibre.gl:android-sdk:11.5.2")
+    implementation("androidx.fragment:fragment:1.8.4")
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
+    implementation("com.google.firebase:firebase-messaging")
 }

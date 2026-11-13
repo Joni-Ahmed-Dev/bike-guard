@@ -13,11 +13,14 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.jsonArray
+import java.util.Base64
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 /** Thin Supabase client (GoTrue auth + PostgREST) over OkHttp. No heavy SDK, easy to audit. */
@@ -113,7 +116,7 @@ class SupabaseApi(private val prefs: Prefs) {
 
     /** Throws IOException when offline; returns null on an HTTP error. */
     suspend fun listDevices(): List<DeviceDto>? {
-        val r = authed { builder("/rest/v1/devices?select=id,name,last_seen&order=created_at.asc", it).get().build() }
+        val r = authed { builder("/rest/v1/devices?select=id,name,last_seen,armed,odometer_km,next_service_km,speed_limit_kmh&order=created_at.asc", it).get().build() }
         return if (r.ok) json.decodeFromString(ListSerializer(DeviceDto.serializer()), r.body) else null
     }
 
@@ -141,5 +144,155 @@ class SupabaseApi(private val prefs: Prefs) {
             "&order=recorded_at.desc&limit=$limit"
         val r = authed { builder(q, it).get().build() }
         return if (r.ok) json.decodeFromString(ListSerializer(LocationDto.serializer()), r.body) else null
+    }
+
+    // ---------- trips (Phase 2) ----------
+
+    /** Trips detected by the device_trips() SQL function. Throws IOException offline; null on HTTP error. */
+    suspend fun trips(deviceId: String, sinceIso: String): List<TripDto>? {
+        val body = buildJsonObject { put("p_device", deviceId); put("p_since", sinceIso) }.toString()
+        val r = authed { builder("/rest/v1/rpc/device_trips", it).post(body.toRequestBody(jsonType)).build() }
+        return if (r.ok) json.decodeFromString(ListSerializer(TripDto.serializer()), r.body) else null
+    }
+
+    /** All points of one trip, oldest first, fetched page by page (server caps a page at ~1000 rows). */
+    suspend fun tripPoints(deviceId: String, fromIso: String, toIso: String): List<PointDto>? {
+        val out = ArrayList<PointDto>()
+        var offset = 0
+        repeat(12) {
+            val q = "/rest/v1/locations?device_id=eq.$deviceId" +
+                "&recorded_at=gte.${URLEncoder.encode(fromIso, "UTF-8")}" +
+                "&recorded_at=lte.${URLEncoder.encode(toIso, "UTF-8")}" +
+                "&select=lat,lng,speed,recorded_at&order=recorded_at.asc&limit=1000&offset=$offset"
+            val r = authed { builder(q, it).get().build() }
+            if (!r.ok) return null
+            val page = json.decodeFromString(ListSerializer(PointDto.serializer()), r.body)
+            out += page
+            if (page.size < 1000) return out
+            offset += 1000
+        }
+        return out
+    }
+
+    // ---------- device state, events, commands (Phase 3) ----------
+
+    suspend fun patchDeviceState(deviceId: String, patch: DeviceStatePatch): Boolean = try {
+        val payload = json.encodeToString(DeviceStatePatch.serializer(), patch)
+        authed {
+            builder("/rest/v1/devices?id=eq.$deviceId", it)
+                .header("Prefer", "return=minimal").patch(payload.toRequestBody(jsonType)).build()
+        }.ok
+    } catch (e: IOException) { false }
+
+    suspend fun uploadEvents(items: List<EventDto>): UploadResult = try {
+        val payload = json.encodeToString(ListSerializer(EventDto.serializer()), items)
+        val r = authed {
+            builder("/rest/v1/events?on_conflict=device_id,type,created_at", it)
+                .header("Prefer", "resolution=ignore-duplicates,return=minimal")
+                .post(payload.toRequestBody(jsonType)).build()
+        }
+        when {
+            r.ok -> UploadResult.OK
+            r.code == 409 -> { prefs.deviceRegistered = false; UploadResult.RETRY }
+            r.code == 400 || r.code == 422 -> UploadResult.REJECTED
+            else -> UploadResult.RETRY
+        }
+    } catch (e: IOException) { UploadResult.RETRY }
+
+    suspend fun listEvents(limit: Int = 100): List<EventDto>? {
+        val r = authed { builder("/rest/v1/events?select=*&order=created_at.desc&limit=$limit", it).get().build() }
+        return if (r.ok) json.decodeFromString(ListSerializer(EventDto.serializer()), r.body) else null
+    }
+
+    /** @return the new command's id, or null when the server refused it. */
+    suspend fun sendCommand(deviceId: String, type: String, arg: String?): Long? {
+        val payload = json.encodeToString(CommandDto.serializer(), CommandDto(deviceId = deviceId, type = type, arg = arg))
+        val r = authed {
+            builder("/rest/v1/commands", it).header("Prefer", "return=representation")
+                .post(payload.toRequestBody(jsonType)).build()
+        }
+        if (!r.ok) return null
+        return json.decodeFromString(ListSerializer(CommandDto.serializer()), "[" + r.body.trim().trimStart('[').trimEnd(']') + "]")
+            .firstOrNull()?.id
+    }
+
+    suspend fun commandStatus(id: Long): String? {
+        val r = authed { builder("/rest/v1/commands?id=eq.$id&select=id,status", it).get().build() }
+        if (!r.ok) return null
+        return json.decodeFromString(ListSerializer(CommandDto.serializer()), r.body).firstOrNull()?.status
+    }
+
+    suspend fun pendingCommands(deviceId: String): List<CommandDto>? {
+        val q = "/rest/v1/commands?device_id=eq.$deviceId&status=eq.pending&order=id.asc&select=id,type,arg,created_at"
+        val r = authed { builder(q, it).get().build() }
+        return if (r.ok) json.decodeFromString(ListSerializer(CommandDto.serializer()), r.body) else null
+    }
+
+    suspend fun ackCommand(id: Long, status: String): Boolean {
+        val body = buildJsonObject {
+            put("status", status); put("done_at", java.time.Instant.now().toString())
+        }.toString()
+        return authed {
+            builder("/rest/v1/commands?id=eq.$id", it).header("Prefer", "return=minimal")
+                .patch(body.toRequestBody(jsonType)).build()
+        }.ok
+    }
+
+    // ---------- geofences ----------
+
+    suspend fun listGeofences(): List<GeofenceDto>? {
+        val r = authed { builder("/rest/v1/geofences?select=*&order=created_at.asc", it).get().build() }
+        return if (r.ok) json.decodeFromString(ListSerializer(GeofenceDto.serializer()), r.body) else null
+    }
+
+    suspend fun addGeofence(g: GeofenceDto): Boolean {
+        val payload = json.encodeToString(GeofenceDto.serializer(), g)
+        return authed {
+            builder("/rest/v1/geofences", it).header("Prefer", "return=minimal").post(payload.toRequestBody(jsonType)).build()
+        }.ok
+    }
+
+    suspend fun deleteGeofence(id: String): Boolean =
+        authed { builder("/rest/v1/geofences?id=eq.$id", it).delete().build() }.ok
+
+    // ---------- push token + share links (Phase 3/4) ----------
+
+    suspend fun registerPushToken(token: String, deviceId: String): Boolean = try {
+        val payload = json.encodeToString(PushTokenDto.serializer(), PushTokenDto(token, deviceId))
+        authed {
+            builder("/rest/v1/push_tokens?on_conflict=token", it)
+                .header("Prefer", "resolution=merge-duplicates,return=minimal")
+                .post(payload.toRequestBody(jsonType)).build()
+        }.ok
+    } catch (e: IOException) { false }
+
+    suspend fun createShareLink(token: String, deviceId: String, expiresIso: String): Boolean {
+        val payload = json.encodeToString(ShareLinkDto.serializer(), ShareLinkDto(token, deviceId, expiresIso))
+        return authed {
+            builder("/rest/v1/share_links", it).header("Prefer", "return=minimal").post(payload.toRequestBody(jsonType)).build()
+        }.ok
+    }
+
+    suspend fun revokeShareLinks(deviceId: String): Boolean {
+        val body = buildJsonObject { put("revoked", true) }.toString()
+        return authed {
+            builder("/rest/v1/share_links?device_id=eq.$deviceId&revoked=eq.false", it)
+                .header("Prefer", "return=minimal").patch(body.toRequestBody(jsonType)).build()
+        }.ok
+    }
+
+    // ---------- token for the Realtime websocket ----------
+
+    /** A usable access token; refreshes first when the current one is about to expire. Null when signed out. */
+    suspend fun validToken(): String? {
+        val t = prefs.accessToken ?: return null
+        val exp = runCatching {
+            val payload = String(Base64.getUrlDecoder().decode(t.split(".")[1]))
+            json.parseToJsonElement(payload).jsonObject["exp"]!!.jsonPrimitive.content.toLong()
+        }.getOrDefault(0L)
+        if (exp - System.currentTimeMillis() / 1000 < 60) {
+            if (!refresh()) return prefs.accessToken?.takeIf { exp > System.currentTimeMillis() / 1000 }
+        }
+        return prefs.accessToken
     }
 }

@@ -8,6 +8,7 @@ import java.io.IOException
 /** Uploads the offline queue in batches. Safe to call from anywhere, any number of times. */
 class SyncManager(
     private val dao: PendingDao,
+    private val events: EventDao,
     private val api: SupabaseApi,
     private val prefs: Prefs,
 ) {
@@ -30,6 +31,25 @@ class SyncManager(
                     UploadResult.OK, UploadResult.REJECTED -> dao.delete(batch.map { it.id })
                     UploadResult.RETRY -> { allSent = false; break }
                 }
+            }
+            // alerts (tamper, theft, crash ...) go right after the locations
+            while (allSent) {
+                val batch = events.next(50)
+                if (batch.isEmpty()) break
+                when (api.uploadEvents(batch.map { it.toDto(prefs.deviceId) })) {
+                    UploadResult.OK, UploadResult.REJECTED -> events.delete(batch.map { it.id })
+                    UploadResult.RETRY -> { allSent = false; break }
+                }
+            }
+            // mirror armed / odometer / limits to the server so the Viewer can show them
+            if (allSent && prefs.stateDirty) {
+                val patch = DeviceStatePatch(
+                    armed = prefs.parkingArmed, trackingExpected = prefs.shouldTrack,
+                    odometerKm = prefs.odometerKm.toDouble(),
+                    nextServiceKm = prefs.nextServiceKm.takeIf { it > 0f }?.toDouble(),
+                    speedLimitKmh = prefs.speedLimitKmh,
+                )
+                if (api.patchDeviceState(prefs.deviceId, patch)) prefs.stateDirty = false
             }
             allSent
         } catch (e: IOException) {

@@ -10,8 +10,10 @@ import com.bikeguard.app.BikeGuardApp
 import com.bikeguard.app.R
 import com.bikeguard.app.data.AuthResult
 import com.bikeguard.app.data.MODE_ALWAYS
-import com.bikeguard.app.data.MODE_MANUAL
+import com.bikeguard.app.data.MODE_AUTO
+import com.bikeguard.app.tracker.AutoMode
 import com.bikeguard.app.tracker.TrackerState
+import com.bikeguard.app.tracker.TrackingControl
 import com.bikeguard.app.tracker.TrackingService
 import com.bikeguard.app.tracker.tryStartTracking
 import kotlinx.coroutines.Dispatchers
@@ -59,22 +61,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private suspend fun endSession(flushFirst: Boolean) {
         if (flushFirst) withTimeoutOrNull(5_000) { app.sync.flush() } // best effort: don't lose queued points
         TrackingService.stop(app)
+        AutoMode.disable(app)
         withContext(Dispatchers.IO) { app.db.pending().clear() }
         app.prefs.clearSession()
         TrackerState.lastFix.value = null
+        TrackerState.armed.value = false
         loggedIn = false
     }
 
-    fun setTracking(on: Boolean) {
-        app.prefs.trackingActive = on
-        if (on) app.tryStartTracking() else TrackingService.stop(app)
-    }
+    fun setTracking(on: Boolean) = TrackingControl.set(app, on)
 
     fun updateMode(m: String) {
         mode = m
         app.prefs.mode = m
-        if (m == MODE_ALWAYS) app.tryStartTracking()
-        if (m == MODE_MANUAL) app.prefs.trackingActive = TrackerState.running.value // keep running, now user-controlled
+        // Leaving Always-on: keep the current run going, but it is user/auto-controlled from now on.
+        if (m == MODE_ALWAYS) app.tryStartTracking() else app.prefs.trackingActive = TrackerState.running.value
+        if (m == MODE_AUTO) AutoMode.enable(app) else AutoMode.disable(app)
     }
 
     fun setInterval(sec: Int) {
@@ -85,6 +87,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Called when the UI opens: revive tracking if the mode or earlier state says it should be on. */
     fun ensureTracking() {
+        if (app.prefs.mode == MODE_AUTO) AutoMode.enable(app)
         if (app.prefs.shouldTrack && !TrackerState.running.value) app.tryStartTracking()
     }
 }
