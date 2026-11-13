@@ -53,7 +53,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
 
     // Local mirrors of the stored settings so the switches react instantly.
     // Keyed on the server row: when it loads, the screen shows the server's values.
-    var autoArm by remember { mutableStateOf(prefs.autoArm) }
+    var autoArm by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.autoArm ?: prefs.autoArm) }
     var siren by remember { mutableStateOf(prefs.sirenOnAlert) }
     var crash by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.crashEnabled ?: prefs.crashDetection) }
     var sms by remember { mutableStateOf(prefs.sosSms) }
@@ -143,6 +143,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 ReadOnlyRow(stringResource(R.string.set_interval), stringResource(R.string.interval_s, vm.intervalSec))
                 ReadOnlyRow(stringResource(R.string.limit_title), if (limit == 0) stringResource(R.string.limit_off) else stringResource(R.string.limit_kmh, limit))
                 ReadOnlyRow(stringResource(R.string.guard_parking), if (prefs.parkingArmed) stringResource(R.string.ctl_arm) else stringResource(R.string.ctl_disarm))
+                ReadOnlyRow(stringResource(R.string.guard_auto), if (prefs.autoArm) stringResource(R.string.ctl_arm) else stringResource(R.string.ctl_disarm))
                 ReadOnlyRow(stringResource(R.string.safety_crash), if (crash) stringResource(R.string.ctl_arm) else stringResource(R.string.ctl_disarm))
                 ReadOnlyRow(stringResource(R.string.safety_number), number.ifBlank { stringResource(R.string.none) })
                 ReadOnlyRow(stringResource(R.string.set_service), if (serviceEvery == 0) stringResource(R.string.service_off) else stringResource(R.string.service_every, serviceEvery))
@@ -192,7 +193,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         Panel(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.set_guard), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
-            SwitchRow(stringResource(R.string.guard_auto), null, autoArm) { autoArm = it; prefs.autoArm = it }
+            SwitchRow(stringResource(R.string.guard_auto), null, autoArm) { autoArm = it; prefs.autoArm = it; if (isRemote) vm.pushSettings() }
             SwitchRow(stringResource(R.string.guard_siren), null, siren) { siren = it; prefs.sirenOnAlert = it }
         }
 

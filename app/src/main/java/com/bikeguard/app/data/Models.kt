@@ -140,6 +140,7 @@ data class DeviceSettingsDto(
     @SerialName("interval_sec") val intervalSec: Int = 5,
     @SerialName("speed_limit_kmh") val speedLimitKmh: Int = 0,
     @SerialName("guard_armed") val guardArmed: Boolean = false,
+    @SerialName("auto_arm") val autoArm: Boolean = false,
     @SerialName("crash_enabled") val crashEnabled: Boolean = true,
     @SerialName("sos_number") val sosNumber: String = "",
     @SerialName("service_km") val serviceKm: Int = 0,

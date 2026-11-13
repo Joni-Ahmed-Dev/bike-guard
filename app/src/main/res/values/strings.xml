@@ -244,6 +244,7 @@
     <string name="offline_map_done">Offline map saved</string>
     <string name="offline_map_failed">Could not download the map</string>
     <string name="ev_health_warning">Tracker phone needs attention</string>
+    <string name="ev_auto_armed">Guard armed automatically</string>
     <string name="tracker_view_only">Settings are controlled by your phone. This phone only tracks.</string>
     <string name="set_role">Phone role</string>
     <string name="pin_label">PIN</string>

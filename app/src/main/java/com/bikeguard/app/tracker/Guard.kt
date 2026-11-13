@@ -117,6 +117,8 @@ class Guard(private val ctx: Context, private val app: BikeGuardApp) : SensorGua
             }
         } else if (prefs.autoArm && stationaryFor >= 5 * 60_000L && !isLive()) {
             GuardControl.setArmed(ctx, true)
+            // The owner is told the guard armed itself; movement while armed never disarms.
+            raise("auto_armed", "info")
         }
 
         // speed limit: three fixes in a row over the limit

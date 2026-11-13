@@ -244,6 +244,7 @@
     <string name="offline_map_done">অফলাইন ম্যাপ সংরক্ষণ হয়েছে</string>
     <string name="offline_map_failed">ম্যাপ ডাউনলোড করা যায়নি</string>
     <string name="ev_health_warning">ট্র্যাকার ফোনে নজর দিন</string>
+    <string name="ev_auto_armed">গার্ড নিজে চালু হয়েছে</string>
     <string name="tracker_view_only">সেটিংস আপনার ফোন নিয়ন্ত্রণ করে। এই ফোন শুধু ট্র্যাক করে।</string>
     <string name="set_role">ফোনের ভূমিকা</string>
     <string name="pin_label">PIN</string>

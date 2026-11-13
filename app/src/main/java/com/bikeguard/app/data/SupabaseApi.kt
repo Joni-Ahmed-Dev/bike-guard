@@ -306,6 +306,7 @@ class SupabaseApi(private val prefs: Prefs) {
             put("interval_sec", dto.intervalSec)
             put("speed_limit_kmh", dto.speedLimitKmh)
             put("guard_armed", dto.guardArmed)
+            put("auto_arm", dto.autoArm)
             put("crash_enabled", dto.crashEnabled)
             put("sos_number", dto.sosNumber)
             put("service_km", dto.serviceKm)

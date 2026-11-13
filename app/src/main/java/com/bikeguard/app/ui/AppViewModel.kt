@@ -138,6 +138,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         intervalSec = app.prefs.intervalSec,
         speedLimitKmh = app.prefs.speedLimitKmh,
         guardArmed = app.prefs.parkingArmed,
+        autoArm = app.prefs.autoArm,
         crashEnabled = app.prefs.crashDetection,
         sosNumber = app.prefs.emergencyNumber,
         serviceKm = app.prefs.serviceIntervalKm,
@@ -170,6 +171,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             intervalSec = s.intervalSec; app.prefs.intervalSec = s.intervalSec
             app.prefs.speedLimitKmh = s.speedLimitKmh
             app.prefs.parkingArmed = s.guardArmed
+            app.prefs.autoArm = s.autoArm
             app.prefs.crashDetection = s.crashEnabled
             app.prefs.emergencyNumber = s.sosNumber
             app.prefs.serviceIntervalKm = s.serviceKm

@@ -283,6 +283,7 @@ class TrackingService : Service() {
         }
         if (s.speedLimitKmh != p.speedLimitKmh) { p.speedLimitKmh = s.speedLimitKmh; p.stateDirty = true }
         if (s.guardArmed != p.parkingArmed) GuardControl.setArmed(this, s.guardArmed)
+        if (s.autoArm != p.autoArm) p.autoArm = s.autoArm
         if (s.crashEnabled != p.crashDetection) p.crashDetection = s.crashEnabled
         if (s.sosNumber != p.emergencyNumber) p.emergencyNumber = s.sosNumber
         if (s.serviceKm != p.serviceIntervalKm) p.scheduleService(s.serviceKm)
@@ -303,6 +304,7 @@ class TrackingService : Service() {
             val dto = DeviceSettingsDto(
                 deviceId = p.deviceId, mode = p.mode, intervalSec = p.intervalSec,
                 speedLimitKmh = p.speedLimitKmh, guardArmed = p.parkingArmed,
+                autoArm = p.autoArm,
                 crashEnabled = p.crashDetection, sosNumber = p.emergencyNumber,
                 serviceKm = p.serviceIntervalKm,
                 guardScheduleStart = p.guardScheduleStart.takeIf { it in 0..23 },
