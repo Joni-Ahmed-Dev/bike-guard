@@ -108,7 +108,8 @@ class SyncManager(
             while (true) {
                 val batch = dao.next(100)
                 if (batch.isEmpty()) break
-                uploadLocationsSplit(batch, ownerId)?.let { fail("upload: $it"); break }
+                val err = uploadLocationsSplit(batch, ownerId)
+                if (err != null) { fail("upload: $err"); break }
             }
             // alerts (tamper, theft, crash ...) upload even when the locations failed
             while (true) {
