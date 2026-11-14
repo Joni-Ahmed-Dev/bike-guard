@@ -2,9 +2,11 @@ package com.bikeguard.app.ui.trips
 
 import androidx.core.graphics.ColorUtils
 import com.bikeguard.app.data.PointDto
+import kotlin.math.asin
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 data class Sample(val lat: Double, val lng: Double, val speedKmh: Float, val bearing: Float)
 
@@ -27,6 +29,35 @@ fun sampleAt(pts: List<PointDto>, times: LongArray, t: Long): Sample {
         a.lat + (b.lat - a.lat) * f, a.lng + (b.lng - a.lng) * f,
         (a.speed ?: 0f) * 3.6f, bearingDeg(a.lat, a.lng, b.lat, b.lng),
     )
+}
+
+/** Great-circle distance in metres between two points. */
+fun haversineM(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+    val earthR = 6_371_000.0
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLng = Math.toRadians(lng2 - lng1)
+    val a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLng / 2) * sin(dLng / 2)
+    return 2 * earthR * asin(minOf(1.0, sqrt(a)))
+}
+
+/**
+ * A trip's distance with GPS jitter removed: a segment only counts when it is a real move —
+ * either end reports at least 1 m/s (the server's own "moving" line) with a step of at
+ * least 5 m, or the step is at least 50 m, clearly beyond any fix accuracy. Segments
+ * between two stationary / jitter points contribute 0. This is the second layer: the
+ * tracker already drops jitter fixes before upload, so new trips should not need it,
+ * but already stored points still carry the jitter.
+ */
+fun filteredDistanceM(points: List<PointDto>): Double {
+    var total = 0.0
+    for (i in 1 until points.size) {
+        val a = points[i - 1]; val b = points[i]
+        val d = haversineM(a.lat, a.lng, b.lat, b.lng)
+        val fastest = maxOf(a.speed ?: 0f, b.speed ?: 0f)
+        if ((fastest >= 1.0f && d >= 5.0) || d >= 50.0) total += d
+    }
+    return total
 }
 
 private val LOW = 0xFF3DDBD9.toInt()

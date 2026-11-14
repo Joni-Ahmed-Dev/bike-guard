@@ -37,6 +37,7 @@ fun ReplayMap(
     sample: Sample?,
     follow: Boolean,
     onUserGesture: () -> Unit,
+    showRouteLine: Boolean = true,
 ) {
     val density = LocalDensity.current
     val mapView = rememberMapViewWithLifecycle()
@@ -68,18 +69,22 @@ fun ReplayMap(
     )
 
     // Draw the route once per trip and fit the camera to it.
-    LaunchedEffect(points, style, map) {
+    LaunchedEffect(points, style, map, showRouteLine) {
         val s = style; val m = map
         if (s == null || m == null || points.size < 2) return@LaunchedEffect
-        val segments = ArrayList<Feature>(points.size)
-        for (i in 0 until points.size - 1) {
-            val a = points[i]; val b = points[i + 1]
-            val kmh = ((a.speed ?: 0f) + (b.speed ?: 0f)) / 2f * 3.6f
-            segments += Feature.fromGeometry(
-                LineString.fromLngLats(listOf(Point.fromLngLat(a.lng, a.lat), Point.fromLngLat(b.lng, b.lat)))
-            ).also { it.addStringProperty("c", colorHex(speedColor(kmh))) }
+        if (showRouteLine) {
+            val segments = ArrayList<Feature>(points.size)
+            for (i in 0 until points.size - 1) {
+                val a = points[i]; val b = points[i + 1]
+                val kmh = ((a.speed ?: 0f) + (b.speed ?: 0f)) / 2f * 3.6f
+                segments += Feature.fromGeometry(
+                    LineString.fromLngLats(listOf(Point.fromLngLat(a.lng, a.lat), Point.fromLngLat(b.lng, b.lat)))
+                ).also { it.addStringProperty("c", colorHex(speedColor(kmh))) }
+            }
+            s.getSourceAs<GeoJsonSource>("route-src")?.setGeoJson(FeatureCollection.fromFeatures(segments))
+        } else {
+            s.getSourceAs<GeoJsonSource>("route-src")?.setGeoJson(FeatureCollection.fromFeatures(emptyList<Feature>()))
         }
-        s.getSourceAs<GeoJsonSource>("route-src")?.setGeoJson(FeatureCollection.fromFeatures(segments))
         s.getSourceAs<GeoJsonSource>("ends-src")?.setGeoJson(
             FeatureCollection.fromFeatures(listOf(endPoint(points.first(), "#EAF0F8"), endPoint(points.last(), EMBER)))
         )

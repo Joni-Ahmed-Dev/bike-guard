@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.time.LocalTime
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -50,6 +51,14 @@ class Guard(private val ctx: Context, private val app: BikeGuardApp) : SensorGua
 
     private fun raise(type: String, severity: String, data: kotlinx.serialization.json.JsonObject? = null) =
         GuardControl.raise(ctx, type, severity, data)
+
+    /** True when there is no guard schedule, or the current hour is inside the window. */
+    private fun insideScheduleWindow(): Boolean {
+        val start = prefs.guardScheduleStart; val end = prefs.guardScheduleEnd
+        if (start !in 0..23 || end !in 0..23 || start == end) return true
+        val hour = LocalTime.now().hour
+        return if (start < end) hour in start until end else hour >= start || hour < end
+    }
 
     // ---------- tamper signals ----------
 
@@ -116,7 +125,8 @@ class Guard(private val ctx: Context, private val app: BikeGuardApp) : SensorGua
                 }
             }
         } else if (prefs.autoArm && stationaryFor >= 5 * 60_000L && !isLive()
-            && System.currentTimeMillis() - prefs.manualDisarmAtMs >= TrackingService.DISARM_LATCH_MS) {
+            && System.currentTimeMillis() - prefs.manualDisarmAtMs >= TrackingService.DISARM_LATCH_MS
+            && insideScheduleWindow()) {
             GuardControl.setArmed(ctx, true)
             // The owner is told the guard armed itself; movement while armed never disarms.
             raise("auto_armed", "info")

@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.bikeguard.app.R
+import com.bikeguard.app.bikeApp
 import com.bikeguard.app.data.TripDto
 import com.bikeguard.app.ui.fmtClock
 import com.bikeguard.app.ui.fmtDuration
@@ -58,7 +59,7 @@ fun ReplayScreen(modifier: Modifier, vm: TripsViewModel, trip: TripDto) {
     val score = remember(pts) { rideScore(pts) }
 
     Box(modifier.fillMaxSize()) {
-        ReplayMap(Modifier.fillMaxSize(), pts, sample, follow, onUserGesture = { follow = false })
+        ReplayMap(Modifier.fillMaxSize(), pts, sample, follow, onUserGesture = { follow = false }, showRouteLine = ctx.bikeApp.prefs.showRouteLine)
 
         IconButton(
             onClick = vm::close,

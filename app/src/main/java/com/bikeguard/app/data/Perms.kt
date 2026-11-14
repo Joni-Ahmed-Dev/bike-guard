@@ -16,6 +16,10 @@ object Perms {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || granted(c, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
     fun hasNotifications(c: Context) =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || granted(c, Manifest.permission.POST_NOTIFICATIONS)
+
+    /** POST_NOTIFICATIONS on Android 13+, or null where no runtime permission exists. */
+    fun notificationsPermission(): String? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Manifest.permission.POST_NOTIFICATIONS else null
     fun ignoringBatteryOptimizations(c: Context) =
         c.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(c.packageName)
 }

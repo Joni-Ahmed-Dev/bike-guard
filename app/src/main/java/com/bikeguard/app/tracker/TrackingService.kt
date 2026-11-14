@@ -63,6 +63,10 @@ class TrackingService : Service() {
     private var currentIntervalMs = 0L
     private var lastMoveAt = 0L
     private var prevFix: Location? = null
+    /** Last fix accepted for upload: jitter is measured against this, never against a skipped fix. */
+    private var anchorFix: Location? = null
+    /** When the last accepted (or heartbeat) fix was sent, elapsedRealtime ms. */
+    private var lastAcceptedAtMs = 0L
     private var autoStopping = false
     private var lastBattery: Int? = null
     private var lastCharging: Boolean? = null
@@ -154,6 +158,8 @@ class TrackingService : Service() {
     private fun beginUpdates() {
         lastMoveAt = SystemClock.elapsedRealtime()
         prevFix = null
+        anchorFix = null
+        lastAcceptedAtMs = 0L
         autoStopping = false
         lastStationaryFor = 0L
         TrackerState.parked.value = false
@@ -205,31 +211,79 @@ class TrackingService : Service() {
         TrackerState.parked.value = stationaryFor >= AdaptivePolicy.PARKED_AFTER_MS
         reevaluateInterval()
 
-        TrackerState.lastFix.value = FixInfo(
-            loc.latitude, loc.longitude, speedMs * 3.6f,
-            if (loc.hasAccuracy()) loc.accuracy else 0f, loc.time
-        )
+        // Guard sees every raw fix, so tamper / movement detection is unaffected by the
+        // jitter filter below: its own "moved" threshold still fires on a real displacement.
         guard.onFix(loc, speedMs, battery, stationaryFor)
 
-        scope.launch {
-            val dao = app.db.pending()
-            dao.insert(
-                PendingLocation(
-                    lat = loc.latitude, lng = loc.longitude,
-                    speed = speedMs,
-                    bearing = if (loc.hasBearing()) loc.bearing else null,
-                    accuracy = if (loc.hasAccuracy()) loc.accuracy else null,
-                    battery = battery, charging = charging, recordedAt = loc.time
-                )
+        // GPS jitter while parked: never upload it, never move the displayed marker.
+        if (isAcceptedFix(loc, speedMs, now)) {
+            anchorFix = loc
+            lastAcceptedAtMs = now
+            TrackerState.lastFix.value = FixInfo(
+                loc.latitude, loc.longitude, speedMs * 3.6f,
+                if (loc.hasAccuracy()) loc.accuracy else 0f, loc.time
             )
-            dao.trim(MAX_QUEUE)
-            flushSignal.trySend(Unit)
+            scope.launch {
+                val dao = app.db.pending()
+                dao.insert(
+                    PendingLocation(
+                        lat = loc.latitude, lng = loc.longitude,
+                        speed = speedMs,
+                        bearing = if (loc.hasBearing()) loc.bearing else null,
+                        accuracy = if (loc.hasAccuracy()) loc.accuracy else null,
+                        battery = battery, charging = charging, recordedAt = loc.time
+                    )
+                )
+                dao.trim(MAX_QUEUE)
+                flushSignal.trySend(Unit)
+            }
+        } else if (now - lastAcceptedAtMs >= STATIONARY_HEARTBEAT_MS) {
+            // Parked for a while: re-send the anchor itself (speed 0, same spot), so the
+            // Remote phone still sees the bike live without the marker wandering.
+            // A re-sent anchor adds zero trip distance and is too slow for trip detection.
+            val anchor = anchorFix
+            if (anchor != null) {
+                lastAcceptedAtMs = now
+                TrackerState.lastFix.value = FixInfo(
+                    anchor.latitude, anchor.longitude, 0f,
+                    if (anchor.hasAccuracy()) anchor.accuracy else 0f, loc.time
+                )
+                scope.launch {
+                    val dao = app.db.pending()
+                    dao.insert(
+                        PendingLocation(
+                            lat = anchor.latitude, lng = anchor.longitude,
+                            speed = 0f, bearing = null,
+                            accuracy = if (anchor.hasAccuracy()) anchor.accuracy else null,
+                            battery = battery, charging = charging, recordedAt = loc.time
+                        )
+                    )
+                    dao.trim(MAX_QUEUE)
+                    flushSignal.trySend(Unit)
+                }
+            }
         }
 
         if (now - lastWidgetAt > 30_000) { lastWidgetAt = now; TrackerWidget.update(this) }
 
         val p = app.prefs
         if (p.mode == MODE_AUTO && stationaryFor >= AdaptivePolicy.AUTO_STOP_AFTER_MS && !p.parkingArmed && !guard.isLive()) autoStop()
+    }
+
+    /**
+     * GPS jitter filter: a fix counts as real when the GPS itself reports movement, when the
+     * bike only just stopped (covers the crash check, which needs a fresh slow fix within
+     * 15 s of an impact), or when it moved clearly beyond the fix accuracy. Anything else
+     * while stationary is jitter: it is dropped, and [anchorFix] stays where the bike is.
+     * A derived speed (no GPS speed) never counts as movement on its own: a jitter jump
+     * between two fixes would otherwise fake one.
+     */
+    private fun isAcceptedFix(loc: Location, speedMs: Float, now: Long): Boolean {
+        val anchor = anchorFix ?: return true
+        if (loc.hasSpeed() && speedMs >= AdaptivePolicy.MOVING_SPEED_MS) return true
+        if (now - lastMoveAt < STOP_SETTLE_MS) return true
+        val threshold = maxOf(if (loc.hasAccuracy()) loc.accuracy else 0f, JITTER_FLOOR_M)
+        return loc.distanceTo(anchor) >= threshold
     }
 
     /** Auto mode: parked long enough. Upload what is queued, then stop. The next "in vehicle" event restarts us. */
@@ -267,6 +321,21 @@ class TrackingService : Service() {
             "set_speed_limit" -> { app.prefs.speedLimitKmh = c.arg?.toIntOrNull() ?: 0; app.prefs.stateDirty = true; pushSettingsToServer() }
             "cancel_sos" -> SosController.cancel(this)
             "mark_serviced" -> app.prefs.markServiced()
+            "tracking_start" -> {
+                app.prefs.trackingActive = true
+                app.prefs.stateDirty = true // the Remote phone reads this back as tracking_expected
+                tryStartTracking()
+            }
+            "tracking_stop" -> {
+                // Refused while the guard is armed, or in Always-on mode: stopping would
+                // kill the monitoring the owner still expects, so the service keeps running.
+                // In Auto mode a later movement may restart tracking on its own.
+                if (!app.prefs.parkingArmed && app.prefs.mode != MODE_ALWAYS) {
+                    app.prefs.trackingActive = false
+                    app.prefs.stateDirty = true
+                    TrackingService.stop(this)
+                }
+            }
         }
         flushSignal.trySend(Unit)
     }
@@ -300,7 +369,9 @@ class TrackingService : Service() {
             reevaluateInterval()
         }
         if (s.speedLimitKmh != p.speedLimitKmh) { p.speedLimitKmh = s.speedLimitKmh; p.stateDirty = true }
-        if (s.guardArmed != p.parkingArmed) GuardControl.setArmed(this, s.guardArmed)
+        // A server row older than a local arm/disarm on this phone must not undo it.
+        if (s.guardArmed != p.parkingArmed && isoToMs(s.updatedAt.orEmpty()) >= p.lastGuardChangeMs)
+            GuardControl.setArmed(this, s.guardArmed, local = false)
         if (s.autoArm != p.autoArm) p.autoArm = s.autoArm
         if (s.sirenOnAlert != p.sirenOnAlert) p.sirenOnAlert = s.sirenOnAlert
         if (s.sosSms != p.sosSms) p.sosSms = s.sosSms
@@ -353,18 +424,22 @@ class TrackingService : Service() {
         else if (!inside && p.scheduleArmed) { GuardControl.setArmed(this, false, latch = false); p.scheduleArmed = false }
     }
 
-    /** Raises one health_warning event when the tracker's health changes for the worse. */
+    /** Raises one health_warning event when the tracker's health changes for the worse,
+     * and a health_ok event when it recovers, so the Dashboard warning clears. */
     private fun checkHealth() {
         val fine = Perms.hasFine(this)
         val battOk = Perms.ignoringBatteryOptimizations(this)
         val key = "fine=$fine|batt=$battOk"
-        if (key == app.prefs.lastHealthState) return
+        val prev = app.prefs.lastHealthState
+        if (key == prev) return
         app.prefs.lastHealthState = key
         if (!fine || !battOk) {
             GuardControl.raise(
                 this, "health_warning", "warning",
                 buildJsonObject { put("location", fine); put("battery_ok", battOk) },
             )
+        } else if (prev.contains("fine=false") || prev.contains("batt=false")) {
+            GuardControl.raise(this, "health_ok", "info")
         }
     }
 
@@ -414,6 +489,12 @@ class TrackingService : Service() {
     companion object {
         private const val NOTIF_ID = 1001
         private const val MAX_QUEUE = 50_000
+        /** Stationary fixes closer than this to the anchor are GPS jitter, never a real move. */
+        const val JITTER_FLOOR_M = 10f
+        /** A parked bike re-sends its anchor position this often so the Remote phone still sees it live. */
+        const val STATIONARY_HEARTBEAT_MS = 10 * 60_000L
+        /** After the bike stops, fixes keep being accepted this long (covers the crash check's 15 s window). */
+        const val STOP_SETTLE_MS = 30_000L
         /** After a manual disarm, auto re-arm (and the guard schedule) waits this long. */
         const val DISARM_LATCH_MS = 10 * 60_000L
         const val ACTION_POLL = "com.bikeguard.app.POLL_COMMANDS"

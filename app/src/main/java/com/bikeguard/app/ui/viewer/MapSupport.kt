@@ -1,8 +1,15 @@
 package com.bikeguard.app.ui.viewer
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -37,4 +44,33 @@ fun rememberMapViewWithLifecycle(): MapView {
         }
     }
     return mapView
+}
+
+/** True when this phone currently has a network with internet capability. */
+fun isOnlineNow(ctx: Context): Boolean {
+    val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+    val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+    return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+}
+
+/**
+ * Connectivity state that updates live as networks come and go (issue #5): the Viewer shows
+ * the offline-map UI only while this is false, and the map reloads live tiles on reconnect.
+ * Snapshot-state writes from the network callback thread are safe; Compose reschedules.
+ */
+@Composable
+fun rememberIsOnline(): Boolean {
+    val ctx = LocalContext.current
+    var online by remember { mutableStateOf(isOnlineNow(ctx)) }
+    DisposableEffect(ctx) {
+        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) { online = true }
+            override fun onLost(network: Network) { online = isOnlineNow(ctx) } // another network may still be up
+            override fun onUnavailable() { online = false }
+        }
+        runCatching { cm?.registerDefaultNetworkCallback(cb) }
+        onDispose { runCatching { cm?.unregisterNetworkCallback(cb) } }
+    }
+    return online
 }

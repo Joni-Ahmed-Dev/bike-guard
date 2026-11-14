@@ -32,10 +32,13 @@ import androidx.compose.ui.unit.dp
 import com.bikeguard.app.BuildConfig
 import com.bikeguard.app.R
 import com.bikeguard.app.bikeApp
+import com.bikeguard.app.ui.viewer.OfflineMap
 import com.bikeguard.app.data.MODE_ALWAYS
 import com.bikeguard.app.data.MODE_AUTO
 import com.bikeguard.app.data.MODE_MANUAL
+import com.bikeguard.app.data.Perms
 import com.bikeguard.app.tracker.AutoMode
+import com.bikeguard.app.tracker.Notifier
 import com.bikeguard.app.ui.AppViewModel
 import com.bikeguard.app.ui.openBatterySettings
 import com.bikeguard.app.ui.diagnostics.DiagnosticsScreen
@@ -73,6 +76,8 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     val isTracker = prefs.isTracker
     val isRemote = prefs.isRemote
     var lowData by remember { mutableStateOf(prefs.lowDataMode) }
+    var showRoute by remember { mutableStateOf(prefs.showRouteLine) }
+    var dlResult by remember { mutableStateOf<Int?>(null) }
     var schedStart by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.guardScheduleStart?.toString() ?: prefs.guardScheduleStart.takeIf { it in 0..23 }?.toString() ?: "") }
     var schedEnd by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.guardScheduleEnd?.toString() ?: prefs.guardScheduleEnd.takeIf { it in 0..23 }?.toString() ?: "") }
     var familyCode by remember { mutableStateOf<String?>(null) }
@@ -96,6 +101,29 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     val smsPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         smsDenied = !ok
         if (ok) { sms = true; prefs.sosSms = true; vm.pushSettings() }
+    }
+    // ---- notification sounds (issue #8): one ringtone per channel ----
+    var alertSound by remember { mutableStateOf(prefs.alertRingtoneUri) }
+    var alertSoundName by remember { mutableStateOf(Notifier.ringtoneName(ctx, prefs.alertRingtoneUri)) }
+    var generalSound by remember { mutableStateOf(prefs.generalRingtoneUri) }
+    var generalSoundName by remember { mutableStateOf(Notifier.ringtoneName(ctx, prefs.generalRingtoneUri)) }
+    var notifOk by remember { mutableStateOf(Perms.hasNotifications(ctx)) }
+    val notifPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        notifOk = ok
+    }
+    val alertSoundPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        Notifier.pickedRingtoneUri(result.data)?.let { uri ->
+            alertSound = uri.toString()
+            Notifier.setAlertRingtone(ctx, uri.toString())
+            alertSoundName = Notifier.ringtoneName(ctx, uri.toString())
+        }
+    }
+    val generalSoundPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        Notifier.pickedRingtoneUri(result.data)?.let { uri ->
+            generalSound = uri.toString()
+            Notifier.setGeneralRingtone(ctx, uri.toString())
+            generalSoundName = Notifier.ringtoneName(ctx, uri.toString())
+        }
     }
     fun pickMode(m: String) {
         if (m == MODE_AUTO && !AutoMode.hasPermission(ctx)) activityPerm.launch(Manifest.permission.ACTIVITY_RECOGNITION)
@@ -375,6 +403,37 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 }
             }
 
+            // ---- route line (this phone's Viewer only, never synced) ----
+            Panel(Modifier.fillMaxWidth()) {
+                SwitchRow(stringResource(R.string.route_line_title), stringResource(R.string.route_line_desc), showRoute) {
+                    showRoute = it; prefs.showRouteLine = it
+                }
+            }
+
+            // ---- offline map download (this phone's Viewer only) ----
+            Panel(Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.offline_dl_title), style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(4.dp))
+                val hasPos = prefs.lastKnownLat != 0.0 || prefs.lastKnownLng != 0.0
+                Text(
+                    stringResource(if (hasPos) R.string.offline_dl_desc else R.string.offline_dl_no_pos),
+                    color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        dlResult = null
+                        OfflineMap.downloadAround(ctx, prefs.lastKnownLat, prefs.lastKnownLng) { dlResult = it }
+                    },
+                    enabled = hasPos,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.offline_dl_title)) }
+                dlResult?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(stringResource(it), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
         }
         } // end of editable settings (tracker role sees them read-only above)
 
@@ -428,6 +487,29 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             Text(stringResource(R.string.battery_body), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(12.dp))
             OutlinedButton(onClick = { openBatterySettings(ctx) }) { Text(stringResource(R.string.open_settings)) }
+        }
+
+        // ---- notification sounds (issue #8): one ringtone per channel ----
+        Panel(Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.notif_sound_title), style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            RingtoneRow(stringResource(R.string.ringtone_alerts), alertSoundName) {
+                alertSoundPicker.launch(Notifier.ringtonePickerIntent(ctx, alertSound, ctx.getString(R.string.ringtone_pick_title)))
+            }
+            RingtoneRow(stringResource(R.string.ringtone_general), generalSoundName) {
+                generalSoundPicker.launch(Notifier.ringtonePickerIntent(ctx, generalSound, ctx.getString(R.string.ringtone_pick_title)))
+            }
+            // Issue #6: the Remote phone never asked for POST_NOTIFICATIONS (only the
+            // tracker setup flow did), so alerts could never appear there. Denial is
+            // fine: alerts still land in the Alerts tab, just without a push.
+            if (!notifOk) {
+                Spacer(Modifier.height(8.dp))
+                Text(stringResource(R.string.notif_perm_needed), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = {
+                    Perms.notificationsPermission()?.let { notifPerm.launch(it) } ?: run { notifOk = true }
+                }) { Text(stringResource(R.string.grant)) }
+            }
         }
 
         // ---- phone role ----
@@ -501,6 +583,18 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             stringResource(R.string.version, BuildConfig.VERSION_NAME),
             color = Palette.Muted, style = MaterialTheme.typography.labelMedium,
         )
+    }
+}
+
+@Composable
+private fun RingtoneRow(title: String, current: String, onPick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(current, color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+        }
+        Spacer(Modifier.width(12.dp))
+        OutlinedButton(onClick = onPick) { Text(stringResource(R.string.ringtone_change)) }
     }
 }
 

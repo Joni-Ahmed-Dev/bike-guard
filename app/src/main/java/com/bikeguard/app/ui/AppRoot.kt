@@ -96,8 +96,6 @@ private fun HomeScreen(vm: AppViewModel, alerts: AlertsViewModel = viewModel()) 
             while (true) { alerts.refresh(); delay(30_000) }
         }
     }
-    LaunchedEffect(tabId) { if (tabId == "alerts") alerts.markSeen() }
-
     Scaffold(
         containerColor = Palette.Ink,
         bottomBar = {

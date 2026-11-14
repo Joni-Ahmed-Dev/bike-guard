@@ -1,5 +1,6 @@
 package com.bikeguard.app.ui.trips
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -101,7 +102,10 @@ private fun TripList(modifier: Modifier, vm: TripsViewModel) {
                                     Text(stringResource(R.string.export_csv))
                                 }
                                 OutlinedButton(onClick = {
-                                    vm.exportLatestTripGpx { gpx -> if (gpx != null) shareText(ctx, gpx) }
+                                    vm.exportLatestTripGpx { gpx ->
+                                        if (gpx != null) shareText(ctx, gpx)
+                                        else Toast.makeText(ctx, ctx.getString(R.string.export_failed), Toast.LENGTH_SHORT).show()
+                                    }
                                 }) { Text(stringResource(R.string.export_gpx)) }
                             }
                         }

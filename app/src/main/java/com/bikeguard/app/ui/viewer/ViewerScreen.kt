@@ -9,6 +9,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
@@ -40,6 +41,8 @@ import com.bikeguard.app.ui.agoText
 import com.bikeguard.app.ui.rememberNow
 import com.bikeguard.app.ui.theme.Palette
 import com.bikeguard.app.ui.theme.Panel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.maplibre.android.geometry.LatLng
 
 private val PEEK = 168.dp
@@ -62,24 +65,33 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
 
     val now = rememberNow()
     val latest = vm.latest
-    val position = latest?.let { LatLng(it.lat, it.lng) }
+    // Marker position after the viewer-side jitter hold (issue #4), not the raw fix.
+    val position = vm.displayPosition
     val trail = remember(vm.trail) { vm.trail.map { LatLng(it.lat, it.lng) } }
     var follow by remember { mutableStateOf(true) }
     var offlineMsg by remember { mutableStateOf<Int?>(null) }
+    // Live connectivity (issue #5): the offline-map chip/message only exist while offline.
+    val online = rememberIsOnline()
+
+    // Sheet state, hoisted so the header can toggle expand/collapse (issue #2).
+    val scaffoldState = rememberBottomSheetScaffoldState()
+    val sheetExpanded = scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded
+    val sheetScope = rememberCoroutineScope()
 
     val age = latest?.let { now - it.recordedAtMs }
     val status = when {
         age == null -> Status.OFFLINE
-        age < 40_000 -> Status.LIVE
-        age < 600_000 -> Status.DELAYED
+        age < 240_000 -> Status.LIVE
+        age < 900_000 -> Status.DELAYED
         else -> Status.OFFLINE
     }
     val deviceName = vm.devices.firstOrNull { it.id == vm.selectedId }?.name.orEmpty()
 
     BottomSheetScaffold(
         modifier = modifier,
-        scaffoldState = rememberBottomSheetScaffoldState(),
+        scaffoldState = scaffoldState,
         sheetPeekHeight = PEEK,
+        sheetGesturesEnabled = true,
         containerColor = Palette.Ink,
         sheetContainerColor = Palette.Surface,
         sheetContentColor = Palette.Text,
@@ -89,7 +101,13 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
             SheetContent(
                 ctx = ctx, now = now, latest = latest, status = status, deviceName = deviceName,
                 loading = !vm.loaded && vm.selectedId != null, noDevice = vm.devicesLoaded && vm.devices.isEmpty(),
-                vm = vm, readOnly = readOnly,
+                vm = vm, readOnly = readOnly, expanded = sheetExpanded,
+                onToggleSheet = {
+                    sheetScope.launch {
+                        if (sheetExpanded) scaffoldState.bottomSheetState.partialExpand()
+                        else scaffoldState.bottomSheetState.expand()
+                    }
+                },
             )
         },
     ) { _ ->
@@ -104,6 +122,8 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
                 attributionBottomDp = PEEK.value.toInt() + 8,
                 onUserGesture = { follow = false },
                 geofences = vm.geofences,
+                showRouteLine = vm.showRouteLine,
+                online = online,
             )
 
             Column(Modifier.align(Alignment.TopStart).statusBarsPadding().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -130,7 +150,10 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
                         )
                     }
                 }
-                if (latest != null) {
+                // Offline-map download (issue #5): the chip and its message exist ONLY while
+                // offline. While online the map already uses live tiles, so showing them was
+                // wrong; the message also clears itself instead of sticking around forever.
+                if (latest != null && !online) {
                     FilterChip(
                         selected = false,
                         onClick = { OfflineMap.downloadAround(ctx, latest.lat, latest.lng) { offlineMsg = it } },
@@ -140,6 +163,7 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
                         ),
                     )
                     offlineMsg?.let {
+                        LaunchedEffect(it) { delay(6_000); offlineMsg = null }
                         Text(
                             stringResource(it), color = Palette.Text,
                             style = MaterialTheme.typography.labelMedium,
@@ -161,9 +185,17 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
 @Composable
 private fun SheetContent(
     ctx: Context, now: Long, latest: LocationDto?, status: Status, deviceName: String, loading: Boolean, noDevice: Boolean,
-    vm: ViewerViewModel, readOnly: Boolean = false,
+    vm: ViewerViewModel, readOnly: Boolean = false, expanded: Boolean = false, onToggleSheet: () -> Unit = {},
 ) {
-    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
+    // Issue #2: while the sheet is only peeking, its content must NOT be scrollable — a
+    // scrollable sheet swallows the drag and the sheet gets stuck halfway. Scrolling turns
+    // on only once fully expanded; before that every drag goes to the sheet itself.
+    val scrollState = rememberScrollState()
+    Column(
+        Modifier.fillMaxWidth()
+            .then(if (expanded) Modifier.verticalScroll(scrollState) else Modifier)
+            .padding(horizontal = 20.dp).padding(bottom = 28.dp)
+    ) {
         when {
             noDevice -> {
                 Text(stringResource(R.string.viewer_no_device_title), style = MaterialTheme.typography.titleLarge)
@@ -180,7 +212,9 @@ private fun SheetContent(
                 }
             }
             else -> {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Tapping the header toggles the sheet fully open / back to peek (issue #2),
+                // so the whole sheet is reachable even if a drag is swallowed.
+                Row(Modifier.fillMaxWidth().clickable(onClick = onToggleSheet), verticalAlignment = Alignment.CenterVertically) {
                     Text(deviceName, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                     Box(Modifier.size(8.dp).background(status.color, CircleShape))
                     Spacer(Modifier.width(6.dp))

@@ -72,12 +72,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun signOut() { viewModelScope.launch { endSession(flushFirst = true) } }
 
     private suspend fun endSession(flushFirst: Boolean) {
-        // Best effort: don't lose queued points. The queue is only wiped when the flush
-        // actually succeeded (it is empty then); a failed or skipped flush keeps the points.
-        val flushed = if (flushFirst) withTimeoutOrNull(5_000) { app.sync.flush() } == true else false
+        // Best effort: don't lose queued points; the flush empties the queue when it works.
+        // But a failed flush must NOT keep the queue: points queued under the old account
+        // would upload under the next account and fail forever (audit #6), so always clear.
+        if (flushFirst) withTimeoutOrNull(5_000) { app.sync.flush() }
         TrackingService.stop(app)
         AutoMode.disable(app)
-        if (flushed) withContext(Dispatchers.IO) { app.db.pending().clear() }
+        withContext(Dispatchers.IO) { app.db.pending().clear(); app.db.events().clear() }
         app.prefs.clearSession()
         TrackerState.lastFix.value = null
         TrackerState.armed.value = false

@@ -11,10 +11,13 @@ object GuardControl {
     /**
      * [latch] records a manual disarm, so auto re-arm waits 10 minutes. The guard schedule's
      * own window-end disarm passes latch = false, so it never blocks the next window.
+     * [local] is false when the change came from the server: server changes do not stamp
+     * [Prefs.lastGuardChangeMs], so they never outrank a newer local arm/disarm.
      */
-    fun setArmed(ctx: Context, on: Boolean, latch: Boolean = true) {
+    fun setArmed(ctx: Context, on: Boolean, latch: Boolean = true, local: Boolean = true) {
         val app = ctx.bikeApp
         app.prefs.parkingArmed = on
+        if (local) app.prefs.lastGuardChangeMs = System.currentTimeMillis()
         app.prefs.stateDirty = true
         TrackerState.armed.value = on
         if (!on && latch) app.prefs.manualDisarmAtMs = System.currentTimeMillis()

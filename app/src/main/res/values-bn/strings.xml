@@ -293,4 +293,21 @@
     <string name="diag_ok">ঠিক আছে</string>
     <string name="diag_failed_short">ব্যর্থ</string>
     <string name="diag_hint">এই রিপোর্ট ডায়াগনস্টিকস সার্ভারে যায়, যাতে স্ক্রিনশট ছাড়াই অ্যাপের সমস্যা দেখা যায়। কোনো লোকেশন পাঠানো হয় না।</string>
+    <string name="dash_tracking_guard_note">গার্ড চালু থাকলে ট্র্যাকিং বন্ধ করা যাবে না</string>
+    <string name="route_line_title">রুটের দাগ</string>
+    <string name="route_line_desc">ম্যাপে বাইকের চলার পথের দাগ দেখাবে।</string>
+    <string name="channel_general">সাধারণ নোটিফিকেশন</string>
+    <string name="notif_sound_title">নোটিফিকেশন শব্দ</string>
+    <string name="ringtone_alerts">সতর্কতা রিংটোন</string>
+    <string name="ringtone_general">নোটিফিকেশন রিংটোন</string>
+    <string name="ringtone_default">ডিফল্ট শব্দ</string>
+    <string name="ringtone_change">বদলান</string>
+    <string name="ringtone_pick_title">একটি শব্দ বেছে নিন</string>
+    <string name="notif_perm_needed">এই ফোনে বাইকের সতর্কতা পেতে নোটিফিকেশন চালু করুন।</string>
+    <string name="cmd_expired">ট্র্যাকার সময়মতো এটি পায়নি</string>
+    <string name="offline_dl_title">অফলাইন ম্যাপ ডাউনলোড</string>
+    <string name="offline_dl_desc">ইন্টারনেট না থাকলে ব্যবহারের জন্য বাইকের আশেপাশের ম্যাপ সংরক্ষণ করুন।</string>
+    <string name="offline_dl_no_pos">বাইকের লোকেশন এখনো জানা যায়নি।</string>
+    <string name="ev_health_ok">ট্র্যাকার ফোন আবার ঠিক আছে</string>
+    <string name="export_failed">এক্সপোর্ট হয়নি</string>
 </resources>

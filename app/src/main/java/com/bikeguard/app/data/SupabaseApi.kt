@@ -146,7 +146,7 @@ class SupabaseApi(private val prefs: Prefs) {
     /** Throws IOException when offline; returns null on an HTTP error. */
     suspend fun listDevices(): List<DeviceDto>? {
         val r = authed { builder("/rest/v1/devices?select=id,name,last_seen,armed,odometer_km,next_service_km,speed_limit_kmh&order=created_at.asc", it).get().build() }
-        return if (r.ok) json.decodeFromString(ListSerializer(DeviceDto.serializer()), r.body) else null
+        return if (r.ok) runCatching { json.decodeFromString(ListSerializer(DeviceDto.serializer()), r.body) }.getOrNull() else null
     }
 
     // ---------- locations ----------
@@ -172,7 +172,7 @@ class SupabaseApi(private val prefs: Prefs) {
             "&select=device_id,lat,lng,speed,bearing,accuracy,battery,is_charging,recorded_at" +
             "&order=recorded_at.desc&limit=$limit"
         val r = authed { builder(q, it).get().build() }
-        return if (r.ok) json.decodeFromString(ListSerializer(LocationDto.serializer()), r.body) else null
+        return if (r.ok) runCatching { json.decodeFromString(ListSerializer(LocationDto.serializer()), r.body) }.getOrNull() else null
     }
 
     // ---------- trips (Phase 2) ----------
@@ -181,7 +181,7 @@ class SupabaseApi(private val prefs: Prefs) {
     suspend fun trips(deviceId: String, sinceIso: String): List<TripDto>? {
         val body = buildJsonObject { put("p_device", deviceId); put("p_since", sinceIso) }.toString()
         val r = authed { builder("/rest/v1/rpc/device_trips", it).post(body.toRequestBody(jsonType)).build() }
-        return if (r.ok) json.decodeFromString(ListSerializer(TripDto.serializer()), r.body) else null
+        return if (r.ok) runCatching { json.decodeFromString(ListSerializer(TripDto.serializer()), r.body) }.getOrNull() else null
     }
 
     /** All points of one trip, oldest first, fetched page by page (server caps a page at ~1000 rows). */
@@ -195,7 +195,7 @@ class SupabaseApi(private val prefs: Prefs) {
                 "&select=lat,lng,speed,recorded_at&order=recorded_at.asc&limit=1000&offset=$offset"
             val r = authed { builder(q, it).get().build() }
             if (!r.ok) return null
-            val page = json.decodeFromString(ListSerializer(PointDto.serializer()), r.body)
+            val page = runCatching { json.decodeFromString(ListSerializer(PointDto.serializer()), r.body) }.getOrNull() ?: return null
             out += page
             if (page.size < 1000) return out
             offset += 1000
@@ -231,7 +231,7 @@ class SupabaseApi(private val prefs: Prefs) {
 
     suspend fun listEvents(limit: Int = 100): List<EventDto>? {
         val r = authed { builder("/rest/v1/events?select=*&order=created_at.desc&limit=$limit", it).get().build() }
-        return if (r.ok) json.decodeFromString(ListSerializer(EventDto.serializer()), r.body) else null
+        return if (r.ok) runCatching { json.decodeFromString(ListSerializer(EventDto.serializer()), r.body) }.getOrNull() else null
     }
 
     /** @return the new command's id, or null when the server refused it. */
@@ -242,20 +242,32 @@ class SupabaseApi(private val prefs: Prefs) {
                 .post(payload.toRequestBody(jsonType)).build()
         }
         if (!r.ok) return null
-        return json.decodeFromString(ListSerializer(CommandDto.serializer()), "[" + r.body.trim().trimStart('[').trimEnd(']') + "]")
-            .firstOrNull()?.id
+        val body = r.body.trim()
+        val list = runCatching { json.decodeFromString(ListSerializer(CommandDto.serializer()), body) }.getOrNull()
+        if (list != null) return list.firstOrNull()?.id
+        return runCatching { json.decodeFromString(CommandDto.serializer(), body.removePrefix("[").removeSuffix("]")) }.getOrNull()?.id
     }
 
     suspend fun commandStatus(id: Long): String? {
         val r = authed { builder("/rest/v1/commands?id=eq.$id&select=id,status", it).get().build() }
         if (!r.ok) return null
-        return json.decodeFromString(ListSerializer(CommandDto.serializer()), r.body).firstOrNull()?.status
+        return runCatching { json.decodeFromString(ListSerializer(CommandDto.serializer()), r.body) }.getOrNull()?.firstOrNull()?.status
+    }
+
+    /** The tracker's mirrored tracking_expected flag, or null when the server cannot be read. */
+    suspend fun trackingExpected(deviceId: String): Boolean? {
+        val r = authed { builder("/rest/v1/devices?id=eq.$deviceId&select=tracking_expected", it).get().build() }
+        if (!r.ok) return null
+        return runCatching {
+            json.parseToJsonElement(r.body).jsonArray.firstOrNull()
+                ?.jsonObject?.get("tracking_expected")?.jsonPrimitive?.content?.toBooleanStrictOrNull()
+        }.getOrNull()
     }
 
     suspend fun pendingCommands(deviceId: String): List<CommandDto>? {
         val q = "/rest/v1/commands?device_id=eq.$deviceId&status=eq.pending&order=id.asc&select=id,type,arg,created_at"
         val r = authed { builder(q, it).get().build() }
-        return if (r.ok) json.decodeFromString(ListSerializer(CommandDto.serializer()), r.body) else null
+        return if (r.ok) runCatching { json.decodeFromString(ListSerializer(CommandDto.serializer()), r.body) }.getOrNull() else null
     }
 
     suspend fun ackCommand(id: Long, status: String): Boolean {
@@ -272,7 +284,7 @@ class SupabaseApi(private val prefs: Prefs) {
 
     suspend fun listGeofences(): List<GeofenceDto>? {
         val r = authed { builder("/rest/v1/geofences?select=*&order=created_at.asc", it).get().build() }
-        return if (r.ok) json.decodeFromString(ListSerializer(GeofenceDto.serializer()), r.body) else null
+        return if (r.ok) runCatching { json.decodeFromString(ListSerializer(GeofenceDto.serializer()), r.body) }.getOrNull() else null
     }
 
     suspend fun addGeofence(g: GeofenceDto): Boolean {
@@ -319,7 +331,7 @@ class SupabaseApi(private val prefs: Prefs) {
             builder("/rest/v1/device_settings?device_id=eq.$deviceId&select=*", it).get().build()
         }
         if (!r.ok) return null
-        return json.decodeFromString(ListSerializer(DeviceSettingsDto.serializer()), r.body).firstOrNull()
+        return runCatching { json.decodeFromString(ListSerializer(DeviceSettingsDto.serializer()), r.body) }.getOrNull()?.firstOrNull()
     }
 
     /**
@@ -386,7 +398,7 @@ class SupabaseApi(private val prefs: Prefs) {
             builder("/rest/v1/parking_spots?device_id=eq.$deviceId&select=*&order=created_at.desc&limit=1", it).get().build()
         }
         if (!r.ok) return null
-        return json.decodeFromString(ListSerializer(ParkingSpotDto.serializer()), r.body).firstOrNull()
+        return runCatching { json.decodeFromString(ListSerializer(ParkingSpotDto.serializer()), r.body) }.getOrNull()?.firstOrNull()
     }
 
     /** Updates the note on the newest parking spot for this device. */

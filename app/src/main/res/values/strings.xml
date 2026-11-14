@@ -293,4 +293,21 @@
     <string name="diag_ok">OK</string>
     <string name="diag_failed_short">Failed</string>
     <string name="diag_hint">This report goes to the diagnostics server so the app problem can be seen without a screenshot. No location is sent.</string>
+    <string name="dash_tracking_guard_note">Tracking stays on while the guard is armed</string>
+    <string name="route_line_title">Route line</string>
+    <string name="route_line_desc">Draw the bike's route line on the map.</string>
+    <string name="channel_general">General notifications</string>
+    <string name="notif_sound_title">Notification sounds</string>
+    <string name="ringtone_alerts">Alerts ringtone</string>
+    <string name="ringtone_general">Notifications ringtone</string>
+    <string name="ringtone_default">Default sound</string>
+    <string name="ringtone_change">Change</string>
+    <string name="ringtone_pick_title">Choose a sound</string>
+    <string name="notif_perm_needed">Allow notifications to get bike alerts on this phone.</string>
+    <string name="cmd_expired">The tracker did not pick this up in time</string>
+    <string name="offline_dl_title">Download offline map</string>
+    <string name="offline_dl_desc">Save the map around the bike for when there is no internet.</string>
+    <string name="offline_dl_no_pos">The bike location is not known yet.</string>
+    <string name="ev_health_ok">Tracker phone is healthy again</string>
+    <string name="export_failed">Export failed</string>
 </resources>

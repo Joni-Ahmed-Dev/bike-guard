@@ -119,6 +119,23 @@ class Prefs(context: Context) {
         get() = sp.getLong("alerts_seen", 0L)
         set(v) = sp.edit { putLong("alerts_seen", v) }
 
+    /** Newest event id already posted as a system notification; older ids are never re-notified. */
+    var lastNotifiedEventId: Long
+        get() = sp.getLong("last_notified_event_id", 0L)
+        set(v) = sp.edit { putLong("last_notified_event_id", v) }
+    /** When the last event notification was posted, in millis since epoch; 0 = never. */
+    var lastNotifiedEventMs: Long
+        get() = sp.getLong("last_notified_event_ms", 0L)
+        set(v) = sp.edit { putLong("last_notified_event_ms", v) }
+
+    /** Custom notification sounds, as ringtone URI strings; "" = the system default sound. */
+    var alertRingtoneUri: String
+        get() = sp.getString("ringtone_alerts", "") ?: ""
+        set(v) = sp.edit { putString("ringtone_alerts", v) }
+    var generalRingtoneUri: String
+        get() = sp.getString("ringtone_general", "") ?: ""
+        set(v) = sp.edit { putString("ringtone_general", v) }
+
     /** Last upload failure reason ("no internet" / "timed out" / "server 401"); "" when the last try worked. */
     var lastSyncError: String
         get() = sp.getString("last_sync_error", "") ?: ""
@@ -157,6 +174,21 @@ class Prefs(context: Context) {
     var lowDataMode: Boolean
         get() = sp.getBoolean("low_data", false)
         set(v) = sp.edit { putBoolean("low_data", v) }
+    /** Viewer display preference for this phone only (never synced to the server): draw the route line on the map. */
+    var showRouteLine: Boolean
+        get() = sp.getBoolean("show_route_line", true)
+        set(v) = sp.edit { putBoolean("show_route_line", v) }
+    /** Last known bike position (Remote phone), for the offline-map download in Settings. 0,0 = unknown. */
+    var lastKnownLat: Double
+        get() = sp.getString("last_known_lat", "0.0")?.toDoubleOrNull() ?: 0.0
+        set(v) = sp.edit { putString("last_known_lat", v.toString()) }
+    var lastKnownLng: Double
+        get() = sp.getString("last_known_lng", "0.0")?.toDoubleOrNull() ?: 0.0
+        set(v) = sp.edit { putString("last_known_lng", v.toString()) }
+    /** When the guard was last armed/disarmed on this phone; a server settings row older than this must not undo it. */
+    var lastGuardChangeMs: Long
+        get() = sp.getLong("last_guard_change_ms", 0L)
+        set(v) = sp.edit { putLong("last_guard_change_ms", v) }
     /** Guard schedule from the server: hours 0-23, -1 = no schedule. */
     var guardScheduleStart: Int
         get() = sp.getInt("sched_start", -1)
@@ -192,5 +224,6 @@ class Prefs(context: Context) {
         putBoolean("tracking_active", false)
         putBoolean("armed", false); putBoolean("state_dirty", true)
         remove("invite_code")
+        remove("remote_target") // a stale Remote target must not point at the old account's device
     }
 }

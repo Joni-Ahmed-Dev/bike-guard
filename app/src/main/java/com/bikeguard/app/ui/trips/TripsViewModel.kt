@@ -14,7 +14,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.IOException
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 
 class TripsViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as BikeGuardApp
@@ -30,16 +33,27 @@ class TripsViewModel(application: Application) : AndroidViewModel(application) {
     var pointsLoading by mutableStateOf(false); private set
     var pointsError by mutableStateOf(false); private set
 
+    /**
+     * Today's ride distance in metres, recomputed from the stored points with
+     * [filteredDistanceM] so parked GPS jitter does not count. Null while it is still
+     * loading (or when the points could not be read): callers fall back to the
+     * server trip total. 0.0 when there is no ride today.
+     */
+    var todayDistanceM by mutableStateOf<Double?>(null); private set
+
     private var job: Job? = null
+    private var todayJob: Job? = null
 
     fun load() {
         job?.cancel()
+        todayJob?.cancel()
+        todayDistanceM = null
         job = viewModelScope.launch {
             loading = true; error = false
             try {
                 val list = app.api.listDevices()
                 if (list == null) {
-                    error = true
+                    error = true; trips = null
                 } else {
                     devices = list
                     if (selectedId == null || list.none { it.id == selectedId }) {
@@ -47,11 +61,11 @@ class TripsViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     selectedId?.let { id ->
                         val t = app.api.trips(id, Instant.now().minus(30, ChronoUnit.DAYS).toString())
-                        if (t == null) error = true else trips = t
+                        if (t == null) { error = true; trips = null } else { trips = t; refreshTodayDistance() }
                     }
                 }
             } catch (e: IOException) {
-                error = true
+                error = true; trips = null
             }
             loading = false
         }
@@ -79,6 +93,27 @@ class TripsViewModel(application: Application) : AndroidViewModel(application) {
 
     fun close() { openTrip = null; points = emptyList() }
 
+    /** Recomputes today's distance from the stored points, jitter removed (see [filteredDistanceM]). */
+    private fun refreshTodayDistance() {
+        todayJob?.cancel()
+        val list = trips ?: return
+        val dayStart = LocalDate.now(ZoneId.systemDefault()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val todayTrips = list.filter { it.startedMs >= dayStart }
+        if (todayTrips.isEmpty()) { todayDistanceM = 0.0; return }
+        val id = selectedId ?: return
+        todayJob = viewModelScope.launch {
+            var total = 0.0
+            try {
+                for (t in todayTrips) {
+                    // Points unreadable: stay null so the Dashboard falls back to the server total.
+                    val p = app.api.tripPoints(id, t.startedAt, t.endedAt) ?: return@launch
+                    total += filteredDistanceM(p)
+                }
+                todayDistanceM = total
+            } catch (e: IOException) { /* keep null: Dashboard falls back to the server total */ }
+        }
+    }
+
     // ---------- weekly report + export (v1.1.0) ----------
 
     data class WeeklySummary(val trips: Int, val km: Double, val minutes: Long, val topSpeed: Double)
@@ -104,7 +139,7 @@ class TripsViewModel(application: Application) : AndroidViewModel(application) {
         val rows = (trips ?: emptyList()).joinToString("\n") { t ->
             val mins = (t.endedMs - t.startedMs) / 60_000
             "${t.startedAt.take(10)},${t.startedAt.drop(11).take(5)},${t.endedAt.drop(11).take(5)}," +
-                "${"%.2f".format(t.distanceM / 1000.0)},$mins,${t.avgSpeedKmh.toInt()},${t.maxSpeedKmh.toInt()}"
+                "${"%.2f".format(Locale.US, t.distanceM / 1000.0)},$mins,${t.avgSpeedKmh.toInt()},${t.maxSpeedKmh.toInt()}"
         }
         return head + rows
     }

@@ -70,8 +70,8 @@ async function tick() {
     if (!placed) { map.jumpTo({ center: ll, zoom: 16 }); placed = true; } else map.easeTo({ center: ll, duration: 800 });
     const age = Math.max(0, Math.round((Date.now() - new Date(loc.recorded_at)) / 1000));
     $("dev").textContent = loc.device_name;
-    $("status").textContent = age < 40 ? T.live : T.stale;
-    $("status").style.color = age < 40 ? "var(--signal)" : "var(--ember)";
+    $("status").textContent = age < 240 ? T.live : T.stale;
+    $("status").style.color = age < 240 ? "var(--signal)" : "var(--ember)";
     $("speed").innerHTML = `${Math.round((loc.speed || 0) * 3.6)}<small>km/h</small>`;
     $("upd").textContent = `${T.ago} ` + (age < 90 ? `${age} ${T.s}` : `${Math.round(age / 60)} ${T.m}`);
     $("bat").textContent = loc.battery != null ? `🔋 ${loc.battery}%` : "";

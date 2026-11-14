@@ -14,6 +14,8 @@ import org.maplibre.android.offline.OfflineTilePyramidRegionDefinition
  * OfflineTilePyramidRegionDefinition, then setDownloadState(STATE_ACTIVE) on the created region.
  */
 object OfflineMap {
+    private const val METADATA = "bikeguard-around"
+
     /** Downloads a roughly 20 km box around [lat]/[lng]. [onResult] gets a string resource id. */
     fun downloadAround(ctx: Context, lat: Double, lng: Double, onResult: (Int) -> Unit) {
         runCatching {
@@ -23,20 +25,41 @@ object OfflineMap {
                 .include(LatLng(lat + 0.09, lng + 0.09))
                 .build()
             val definition = OfflineTilePyramidRegionDefinition(MAP_STYLE, bounds, 10.0, 16.0, density)
-            val metadata = "bikeguard-around".toByteArray(Charsets.UTF_8)
-            OfflineManager.getInstance(ctx).createOfflineRegion(
-                definition, metadata,
-                object : OfflineManager.CreateOfflineRegionCallback {
-                    override fun onCreate(region: OfflineRegion) {
-                        region.setDownloadState(OfflineRegion.STATE_ACTIVE)
+            val mgr = OfflineManager.getInstance(ctx)
+            // Reuse the existing region instead of creating a duplicate on every tap.
+            mgr.listOfflineRegions(object : OfflineManager.ListOfflineRegionsCallback {
+                override fun onList(regions: Array<OfflineRegion>) {
+                    val existing = regions.firstOrNull {
+                        runCatching { String(it.metadata, Charsets.UTF_8) }.getOrNull() == METADATA
+                    }
+                    if (existing != null) {
+                        existing.setDownloadState(OfflineRegion.STATE_ACTIVE)
                         onResult(R.string.offline_map_started)
+                    } else {
+                        createRegion(mgr, definition, onResult)
                     }
+                }
 
-                    override fun onError(error: String) {
-                        onResult(R.string.offline_map_failed)
-                    }
-                },
-            )
+                override fun onError(error: String) {
+                    createRegion(mgr, definition, onResult)
+                }
+            })
         }.onFailure { onResult(R.string.offline_map_failed) }
+    }
+
+    private fun createRegion(mgr: OfflineManager, definition: OfflineTilePyramidRegionDefinition, onResult: (Int) -> Unit) {
+        mgr.createOfflineRegion(
+            definition, METADATA.toByteArray(Charsets.UTF_8),
+            object : OfflineManager.CreateOfflineRegionCallback {
+                override fun onCreate(region: OfflineRegion) {
+                    region.setDownloadState(OfflineRegion.STATE_ACTIVE)
+                    onResult(R.string.offline_map_started)
+                }
+
+                override fun onError(error: String) {
+                    onResult(R.string.offline_map_failed)
+                }
+            },
+        )
     }
 }

@@ -36,7 +36,9 @@ import com.bikeguard.app.ui.theme.Palette
 import com.bikeguard.app.ui.theme.Panel
 import com.bikeguard.app.ui.trips.TripsViewModel
 import com.bikeguard.app.ui.viewer.BikeMap
+import com.bikeguard.app.ui.viewer.rememberIsOnline
 import com.bikeguard.app.ui.viewer.ViewerViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.maplibre.android.geometry.LatLng
 import java.io.IOException
@@ -59,6 +61,7 @@ fun DashboardScreen(
     val owner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val now = rememberNow()
+    val online = rememberIsOnline()
     LaunchedEffect(Unit) { tripsVm.load(); alerts.refresh(); vm.loadGeofences() }
     // The Dashboard is the Remote phone's default tab: start the live poll here too, so it
     // shows live data without opening the Viewer first.
@@ -71,14 +74,14 @@ fun DashboardScreen(
     val age = latest?.let { now - it.recordedAtMs }
     val statusText = when {
         age == null -> R.string.status_offline
-        age < 40_000 -> R.string.status_live
-        age < 600_000 -> R.string.status_delayed
+        age < 240_000 -> R.string.status_live
+        age < 900_000 -> R.string.status_delayed
         else -> R.string.status_offline
     }
     val statusColor = when {
         age == null -> Palette.Muted
-        age < 40_000 -> Palette.Signal
-        age < 600_000 -> Palette.Ember
+        age < 240_000 -> Palette.Signal
+        age < 900_000 -> Palette.Ember
         else -> Palette.Muted
     }
 
@@ -87,12 +90,27 @@ fun DashboardScreen(
         LocalDate.now(ZoneId.systemDefault()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
     }
     val today = remember(tripsVm.trips, dayStart) { tripsVm.trips.orEmpty().filter { it.startedMs >= dayStart } }
-    val todayKm = today.sumOf { it.distanceM }
+    // Jitter-corrected distance when the points have been recomputed, else the server total.
+    val todayKm = tripsVm.todayDistanceM ?: today.sumOf { it.distanceM }
     val todayMs = today.sumOf { it.endedMs - it.startedMs }
     val todayMax = today.maxOfOrNull { it.maxSpeedKmh } ?: 0.0
 
-    val healthEvent = remember(alerts.events) { alerts.events.firstOrNull { it.type == "health_warning" } }
-    val healthBad = healthEvent != null && (now - healthEvent.createdMs) < 24 * 3600_000L
+    // Remote tracking switch: the tracker's own mirrored flag, polled while this screen is open.
+    // Null = not known yet, so the switch stays disabled until the first read.
+    val isRemote = ctx.bikeApp.prefs.isRemote
+    var remoteTrackingOn by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(vm.selectedId) {
+        val id = vm.selectedId ?: return@LaunchedEffect
+        remoteTrackingOn = null
+        while (true) {
+            try { ctx.bikeApp.api.trackingExpected(id)?.let { remoteTrackingOn = it } } catch (e: IOException) { }
+            delay(15_000)
+        }
+    }
+
+    // Newest health event wins: a health_ok recovery clears a stale warning.
+    val healthEvent = remember(alerts.events) { alerts.events.firstOrNull { it.type == "health_warning" || it.type == "health_ok" } }
+    val healthBad = healthEvent?.type == "health_warning" && (now - healthEvent.createdMs) < 24 * 3600_000L
 
     var spot by remember { mutableStateOf<ParkingSpotDto?>(null) }
     var note by remember { mutableStateOf("") }
@@ -144,6 +162,35 @@ fun DashboardScreen(
             }
         }
 
+        // ---- remote tracking on/off (Remote role only; the tracker phone never sees this) ----
+        if (isRemote) {
+            Panel(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.ring_tracking), style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(2.dp))
+                        val armed = device?.armed == true
+                        if (armed) {
+                            Text(
+                                stringResource(R.string.dash_tracking_guard_note),
+                                color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = remoteTrackingOn == true,
+                        enabled = remoteTrackingOn != null && device != null,
+                        onCheckedChange = { on ->
+                            remoteTrackingOn = on // optimistic; the next poll corrects it if the command fails
+                            vm.send(if (on) "tracking_start" else "tracking_stop")
+                        },
+                        colors = SwitchDefaults.colors(checkedTrackColor = Palette.Ember, checkedThumbColor = Palette.Ink),
+                    )
+                }
+            }
+        }
+
         // ---- small map ----
         Panel(Modifier.fillMaxWidth()) {
             BikeMap(
@@ -156,6 +203,8 @@ fun DashboardScreen(
                 attributionBottomDp = 0,
                 onUserGesture = {},
                 geofences = vm.geofences,
+                showRouteLine = ctx.bikeApp.prefs.showRouteLine,
+                online = online,
             )
         }
 

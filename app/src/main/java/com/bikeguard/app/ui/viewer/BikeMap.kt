@@ -59,6 +59,10 @@ fun BikeMap(
     attributionBottomDp: Int,
     onUserGesture: () -> Unit,
     geofences: List<GeofenceDto> = emptyList(),
+    /** Display preference (issue #3): when false the route polyline is hidden. */
+    showRouteLine: Boolean = true,
+    /** Live connectivity (issue #5): coming back online reloads live tiles over the cached ones. */
+    online: Boolean = true,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -139,10 +143,21 @@ fun BikeMap(
         if (follow) shown?.let { map?.animateCamera(CameraUpdateFactory.newLatLng(it), 600) }
     }
 
-    LaunchedEffect(trail, style) {
+    LaunchedEffect(trail, style, showRouteLine) {
         val src = style?.getSourceAs<GeoJsonSource>("trail-src") ?: return@LaunchedEffect
-        if (trail.size >= 2) src.setGeoJson(LineString.fromLngLats(trail.map { Point.fromLngLat(it.longitude, it.latitude) }))
-        else src.setGeoJson(FeatureCollection.fromFeatures(emptyList<Feature>()))
+        if (!showRouteLine || trail.size < 2) src.setGeoJson(FeatureCollection.fromFeatures(emptyList<Feature>()))
+        else src.setGeoJson(LineString.fromLngLats(trail.map { Point.fromLngLat(it.longitude, it.latitude) }))
+    }
+
+    // Offline -> online: reload the style so the map swaps cached offline tiles for live ones.
+    // While offline MapLibre serves the downloaded region for the same style URI on its own.
+    // Guarded to a real transition so a flapping network does not reload the style repeatedly.
+    var wasOnline by remember { mutableStateOf(online) }
+    LaunchedEffect(online) {
+        if (online && !wasOnline) {
+            map?.setStyle(Style.Builder().fromUri(MAP_STYLE)) { s -> addLayers(s); style = s }
+        }
+        wasOnline = online
     }
 
     // Geofence circles, drawn from the server list.

@@ -55,7 +55,7 @@ fun AlertsScreen(modifier: Modifier, vm: AlertsViewModel) {
     val now = rememberNow()
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) { vm.refresh(); vm.markSeen() }
+    LaunchedEffect(Unit) { if (vm.refresh()) vm.markSeen() }
     LaunchedEffect(Unit) { owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { vm.live() } }
 
     Column(modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {

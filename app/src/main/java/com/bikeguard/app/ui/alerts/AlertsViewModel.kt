@@ -21,10 +21,12 @@ class AlertsViewModel(application: Application) : AndroidViewModel(application) 
     var error by mutableStateOf(false); private set
     var unread by mutableIntStateOf(0); private set
 
-    suspend fun refresh() {
+    /** True when the alert list loaded, so the caller knows it is safe to mark them seen. */
+    suspend fun refresh(): Boolean {
+        var ok = false
         try {
             val list = app.api.listEvents(100)
-            if (list == null) error = true else { events = list; error = false; recount() }
+            if (list == null) error = true else { events = list; error = false; recount(); ok = true }
             if (deviceNames.isEmpty()) {
                 app.api.listDevices()?.let { d -> deviceNames = d.associate { (it.id ?: "") to it.name } }
             }
@@ -32,6 +34,7 @@ class AlertsViewModel(application: Application) : AndroidViewModel(application) 
             error = true
         }
         loaded = true
+        return ok
     }
 
     /** Alerts raised by the tracker phone itself are not "unread news" for the person holding it. */
@@ -53,7 +56,9 @@ class AlertsViewModel(application: Application) : AndroidViewModel(application) 
                 app.realtime.events.collect { e ->
                     if (e is RtEvent.Ev && events.none { it.id != null && it.id == e.ev.id }) {
                         events = (listOf(e.ev) + events).take(100)
-                        markSeen()
+                        // Only this new alert is seen (it just slid in); older unread stay unread.
+                        if (e.ev.createdMs > app.prefs.lastAlertsSeenMs) app.prefs.lastAlertsSeenMs = e.ev.createdMs
+                        recount()
                     }
                 }
             } finally {
