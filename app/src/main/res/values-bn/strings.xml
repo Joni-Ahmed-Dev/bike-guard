@@ -317,4 +317,18 @@
     <string name="offline_dl_no_pos">বাইকের লোকেশন এখনো জানা যায়নি।</string>
     <string name="ev_health_ok">ট্র্যাকার ফোন আবার ঠিক আছে</string>
     <string name="export_failed">এক্সপোর্ট হয়নি</string>
+    <string name="tracking_timer_label">চালু আছে</string>
+    <string name="fix_no_fix">এখনো লোকেশন পাওয়া যায়নি</string>
+    <string name="fix_no_fix_hint">ফোনটা খোলা জায়গায় নিন, জিপিএস চালু আছে কি না দেখুন</string>
+    <string name="fix_last_known">শেষ জানা লোকেশন দেখাচ্ছে, লাইভ নয়</string>
+    <string name="fix_gps_off">জিপিএস বন্ধ আছে</string>
+    <string name="fix_gps_off_hint">ট্র্যাক করতে জিপিএস চালু করুন</string>
+    <string name="diag_fix_status">জিপিএস ফিক্স</string>
+    <string name="diag_fix_live">লাইভ</string>
+    <string name="diag_fix_last_known">শেষ জানা অবস্থান</string>
+    <string name="diag_fix_no_fix">এখনো ফিক্স পাওয়া যায়নি</string>
+    <string name="diag_fix_gps_off">জিপিএস বন্ধ</string>
+    <string name="diag_gps">জিপিএস</string>
+    <string name="diag_gps_on">চালু</string>
+    <string name="diag_gps_off">বন্ধ</string>
 </resources>

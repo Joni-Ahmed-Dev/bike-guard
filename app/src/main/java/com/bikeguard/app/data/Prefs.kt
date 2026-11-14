@@ -53,6 +53,12 @@ class Prefs(context: Context) {
     var trackingActive: Boolean
         get() = sp.getBoolean("tracking_active", false)
         set(v) = sp.edit { putBoolean("tracking_active", v) }
+    /** When the current tracking session started, millis since epoch; 0 = not tracking.
+     * Stamped only on the not-tracking -> tracking transition and cleared only on an
+     * explicit stop, so the elapsed time survives a service restart and a phone reboot. */
+    var trackingStartedAtMs: Long
+        get() = sp.getLong("tracking_started_at_ms", 0L)
+        set(v) = sp.edit { putLong("tracking_started_at_ms", v) }
     var mode: String
         get() = sp.getString("mode", MODE_MANUAL) ?: MODE_MANUAL
         set(v) = sp.edit { putString("mode", v) }

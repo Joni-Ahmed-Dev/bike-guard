@@ -1,5 +1,6 @@
 package com.bikeguard.app.ui.diagnostics
 
+import android.location.LocationManager
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -51,8 +52,17 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     val running by TrackerState.running.collectAsStateWithLifecycle()
     val fix by TrackerState.lastFix.collectAsStateWithLifecycle()
+    val fixStatus by TrackerState.fixStatus.collectAsStateWithLifecycle()
     val queued by app.db.pending().count().collectAsStateWithLifecycle(0)
     val now = rememberNow()
+    // Re-read on every tick: the provider can be switched off while this screen is open.
+    val gpsOn = remember(now) {
+        runCatching {
+            val lm = ctx.getSystemService(LocationManager::class.java)
+            lm == null || lm.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        }.getOrDefault(true)
+    }
     var sending by remember { mutableStateOf(false) }
     var sendResult by remember { mutableStateOf<String?>(null) }
     var sendOk by remember { mutableStateOf<Boolean?>(null) }
@@ -98,6 +108,21 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             DiagRow(
                 stringResource(R.string.diag_last_fix),
                 fix?.let { agoText(ctx, it.timeMs, now) } ?: stringResource(R.string.none),
+            )
+            DiagRow(
+                stringResource(R.string.diag_fix_status),
+                stringResource(
+                    when (fixStatus) {
+                        TrackerState.FIX_LIVE -> R.string.diag_fix_live
+                        TrackerState.FIX_LAST_KNOWN -> R.string.diag_fix_last_known
+                        TrackerState.FIX_GPS_OFF -> R.string.diag_fix_gps_off
+                        else -> R.string.diag_fix_no_fix
+                    },
+                ),
+            )
+            DiagRow(
+                stringResource(R.string.diag_gps),
+                stringResource(if (gpsOn) R.string.diag_gps_on else R.string.diag_gps_off),
             )
             DiagRow(stringResource(R.string.diag_queued), stringResource(R.string.unit_points, queued))
             DiagRow(

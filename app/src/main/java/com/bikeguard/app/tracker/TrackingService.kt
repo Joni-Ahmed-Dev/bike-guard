@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.location.Location
+import android.location.LocationManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.IBinder
@@ -65,6 +66,11 @@ class TrackingService : Service() {
     private var prevFix: Location? = null
     /** Last fix accepted for upload: jitter is measured against this, never against a skipped fix. */
     private var anchorFix: Location? = null
+    /** True while the fix in [TrackerState.lastFix] came from the last-known
+     * seed below instead of a live GPS delivery: it is shown, never live. */
+    private var seededFix = false
+    /** Last time the last-known seed was attempted, wall-clock ms; throttles retries. */
+    private var lastSeedAttemptMs = 0L
     /** When the last accepted (or heartbeat) fix was sent, elapsedRealtime ms. */
     private var lastAcceptedAtMs = 0L
     private var autoStopping = false
@@ -111,6 +117,24 @@ class TrackingService : Service() {
                 }
             }
         }
+        // Fix-status watchdog (v1.2.2 issue 1): a fix is only "live" for ~30 s.
+        // Without it the UI kept saying "Live and synced" on a fix from an
+        // hour ago, or on no fix at all. While tracking runs, re-check every
+        // 5 s so a stale fix decays to last-known / gps_off, and retry the
+        // last-known seed while nothing has ever arrived.
+        scope.launch {
+            while (isActive) {
+                try {
+                    if (TrackerState.running.value) {
+                        refreshFixStatus()
+                        seedLastKnown()
+                    }
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                }
+                delay(5_000)
+            }
+        }
         // Remote commands: poll every 15 s, or at once when a push wakes us.
         scope.launch {
             while (isActive) {
@@ -142,6 +166,10 @@ class TrackingService : Service() {
         }
         // A null intent means Android restarted us after killing the process.
         if (!Perms.hasFine(this) || (intent == null && !app.prefs.shouldTrack)) {
+            // Tracking is definitely off now (permission gone, or it was off
+            // before the restart): drop a stale timer stamp. A restart that
+            // resumes tracking never reaches this branch.
+            app.prefs.trackingStartedAtMs = 0L
             stopSelf()
             return START_NOT_STICKY
         }
@@ -163,8 +191,18 @@ class TrackingService : Service() {
         autoStopping = false
         lastStationaryFor = 0L
         TrackerState.parked.value = false
+        // Timer (v1.2.2 issue 1): stamp only on the transition into tracking.
+        // A restart or a reboot re-enters here with the stamp already set, so
+        // the elapsed time survives both; only an explicit stop clears it.
+        if (app.prefs.trackingStartedAtMs == 0L) {
+            app.prefs.trackingStartedAtMs = System.currentTimeMillis()
+        }
         requestUpdates(app.prefs.intervalSec.coerceIn(3, 60) * 1000L)
         TrackerState.running.value = true
+        // Show the last known position right away instead of dashes while the
+        // first real fix is still coming; indoors that can take minutes.
+        seedLastKnown(force = true)
+        refreshFixStatus()
         TrackerWidget.update(this)
         flushSignal.trySend(Unit) // upload anything left over from before
     }
@@ -179,6 +217,76 @@ class TrackingService : Service() {
         client.requestLocationUpdates(request, callback, Looper.getMainLooper())
         currentIntervalMs = ms
         updating = true
+    }
+
+    /**
+     * Single source of truth for [TrackerState.hasFix] / [TrackerState.fixStatus].
+     * A fix is "live" only while it is a real (never seeded) fix at most
+     * [FRESH_FIX_MS] old. Older than that it decays to last-known, and when
+     * the provider is off the reason is gps_off, so the UI can say why
+     * instead of showing dashes next to "Live and synced".
+     */
+    private fun refreshFixStatus() {
+        val fix = TrackerState.lastFix.value
+        val now = System.currentTimeMillis()
+        val fresh = fix != null && !seededFix && now - fix.timeMs <= FRESH_FIX_MS
+        if (fresh) {
+            TrackerState.hasFix.value = true
+            TrackerState.fixStatus.value = TrackerState.FIX_LIVE
+        } else if (!isLocationProviderOn()) {
+            TrackerState.hasFix.value = false
+            TrackerState.fixStatus.value = TrackerState.FIX_GPS_OFF
+        } else if (fix != null) {
+            TrackerState.hasFix.value = false
+            TrackerState.fixStatus.value = TrackerState.FIX_LAST_KNOWN
+        } else {
+            TrackerState.hasFix.value = false
+            TrackerState.fixStatus.value = TrackerState.FIX_NO_FIX
+        }
+    }
+
+    /** True when any location provider can deliver a fix. Fused Location can
+     * fall back to the network provider, so GPS alone being off is not the
+     * whole story; only both off means no fix can arrive. Fails open: an
+     * unexpected error never blames the GPS without proof. */
+    private fun isLocationProviderOn(): Boolean {
+        val lm = getSystemService(LocationManager::class.java) ?: return true
+        return try {
+            lm.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        } catch (e: Exception) {
+            true
+        }
+    }
+
+    /**
+     * Last-known fallback (v1.2.2 issue 1): when tracking starts, and while
+     * no fix has ever arrived, show the fused cached position instead of
+     * dashes, with its real accuracy and age. It is only shown: it never
+     * touches [anchorFix]/[prevFix], is never queued and never uploaded,
+     * and a fresher real fix always replaces it. A seeded fix is never
+     * "live" ([seededFix]), even if the cached point is only seconds old.
+     * Retried at most every [SEED_RETRY_MS] unless [force] is set.
+     */
+    @SuppressLint("MissingPermission")
+    private fun seedLastKnown(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!force && now - lastSeedAttemptMs < SEED_RETRY_MS) return
+        lastSeedAttemptMs = now
+        if (!TrackerState.running.value || !Perms.hasFine(this)) return
+        client.lastLocation.addOnSuccessListener { loc ->
+            if (loc == null) return@addOnSuccessListener
+            val current = TrackerState.lastFix.value
+            // Never overwrite a fresher fix with an older cached point.
+            if (current != null && loc.time <= current.timeMs) return@addOnSuccessListener
+            seededFix = true
+            TrackerState.lastFix.value = FixInfo(
+                loc.latitude, loc.longitude,
+                if (loc.hasSpeed()) loc.speed * 3.6f else 0f,
+                if (loc.hasAccuracy()) loc.accuracy else 0f, loc.time
+            )
+            refreshFixStatus()
+        }
     }
 
     /** Live mode (from the Viewer, or after a theft alert) overrides the parked/low-battery slow-down. */
@@ -219,10 +327,12 @@ class TrackingService : Service() {
         if (isAcceptedFix(loc, speedMs, now)) {
             anchorFix = loc
             lastAcceptedAtMs = now
+            seededFix = false
             TrackerState.lastFix.value = FixInfo(
                 loc.latitude, loc.longitude, speedMs * 3.6f,
                 if (loc.hasAccuracy()) loc.accuracy else 0f, loc.time
             )
+            refreshFixStatus()
             scope.launch {
                 val dao = app.db.pending()
                 dao.insert(
@@ -244,10 +354,12 @@ class TrackingService : Service() {
             val anchor = anchorFix
             if (anchor != null) {
                 lastAcceptedAtMs = now
+                seededFix = false
                 TrackerState.lastFix.value = FixInfo(
                     anchor.latitude, anchor.longitude, 0f,
                     if (anchor.hasAccuracy()) anchor.accuracy else 0f, loc.time
                 )
+                refreshFixStatus()
                 scope.launch {
                     val dao = app.db.pending()
                     dao.insert(
@@ -291,6 +403,7 @@ class TrackingService : Service() {
         if (autoStopping) return
         autoStopping = true
         app.prefs.trackingActive = false
+        app.prefs.trackingStartedAtMs = 0L // explicit stop: the timer ends here
         scope.launch {
             withTimeoutOrNull(8_000) { app.sync.flush() }
             stopSelf()
@@ -497,6 +610,11 @@ class TrackingService : Service() {
         const val STOP_SETTLE_MS = 30_000L
         /** After a manual disarm, auto re-arm (and the guard schedule) waits this long. */
         const val DISARM_LATCH_MS = 10 * 60_000L
+        /** A fix counts as fresh (live) this long after it arrived; older than
+         * this without a new fix it is last-known, never live. */
+        const val FRESH_FIX_MS = 30_000L
+        /** The last-known seed is retried at most this often while no fix exists. */
+        const val SEED_RETRY_MS = 60_000L
         /** A remote command stays executable this long after it was sent. */
         const val FRESH_COMMAND_MS = 10 * 60_000L
         /**
@@ -524,6 +642,11 @@ class TrackingService : Service() {
         }
 
         fun stop(ctx: Context) {
+            // Every caller of stop() is an explicit stop (user toggle off,
+            // remote tracking_stop, sign-out, role change to Remote): the
+            // timer ends here. A service restart never goes through stop(),
+            // so the timer survives it.
+            runCatching { (ctx.applicationContext as BikeGuardApp).prefs.trackingStartedAtMs = 0L }
             ctx.stopService(Intent(ctx, TrackingService::class.java))
         }
     }

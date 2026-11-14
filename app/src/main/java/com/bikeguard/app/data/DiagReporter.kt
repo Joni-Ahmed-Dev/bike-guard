@@ -88,6 +88,8 @@ class DiagReporter(
                 put("tracking", TrackerState.running.value)
                 put("armed", TrackerState.armed.value)
                 put("queued", queued)
+                put("fix_status", TrackerState.fixStatus.value)
+                put("has_fix", TrackerState.hasFix.value)
                 put("last_fix_age_s", if (fix == null) -1 else ((now - fix.timeMs) / 1000).toInt())
                 put("last_sync_error", prefs.lastSyncError)
                 put("last_sync_at", if (prefs.lastSyncAttemptMs == 0L) "" else fmtHourMin(prefs.lastSyncAttemptMs))

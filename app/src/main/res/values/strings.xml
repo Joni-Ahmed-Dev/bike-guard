@@ -317,4 +317,18 @@
     <string name="offline_dl_no_pos">The bike location is not known yet.</string>
     <string name="ev_health_ok">Tracker phone is healthy again</string>
     <string name="export_failed">Export failed</string>
+    <string name="tracking_timer_label">Tracking for</string>
+    <string name="fix_no_fix">No location fix yet</string>
+    <string name="fix_no_fix_hint">Move the phone to an open place and check GPS is on</string>
+    <string name="fix_last_known">Showing last known location, not live</string>
+    <string name="fix_gps_off">GPS is off</string>
+    <string name="fix_gps_off_hint">Turn GPS on to track</string>
+    <string name="diag_fix_status">GPS fix</string>
+    <string name="diag_fix_live">Live</string>
+    <string name="diag_fix_last_known">Last known</string>
+    <string name="diag_fix_no_fix">No fix yet</string>
+    <string name="diag_fix_gps_off">GPS off</string>
+    <string name="diag_gps">GPS</string>
+    <string name="diag_gps_on">On</string>
+    <string name="diag_gps_off">Off</string>
 </resources>

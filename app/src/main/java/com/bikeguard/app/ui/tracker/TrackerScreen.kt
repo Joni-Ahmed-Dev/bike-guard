@@ -58,6 +58,8 @@ import com.bikeguard.app.ui.openBatterySettings
 import com.bikeguard.app.ui.rememberNow
 import com.bikeguard.app.ui.theme.Palette
 import com.bikeguard.app.ui.theme.Panel
+import kotlinx.coroutines.delay
+import java.util.Locale
 
 @Composable
 fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
@@ -85,6 +87,8 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     val running by TrackerState.running.collectAsStateWithLifecycle()
     val online by TrackerState.online.collectAsStateWithLifecycle()
     val fix by TrackerState.lastFix.collectAsStateWithLifecycle()
+    val fixStatus by TrackerState.fixStatus.collectAsStateWithLifecycle()
+    val hasFix by TrackerState.hasFix.collectAsStateWithLifecycle()
     val parked by TrackerState.parked.collectAsStateWithLifecycle()
     val armed by TrackerState.armed.collectAsStateWithLifecycle()
     val queued by ctx.bikeApp.db.pending().count().collectAsStateWithLifecycle(0)
@@ -103,14 +107,26 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         val (stateText, stateColor) = when {
             !running && vm.mode == MODE_AUTO -> R.string.state_auto_waiting to Palette.Muted
             !running -> R.string.state_stopped to Palette.Muted
-            running && online && parked -> R.string.state_parked to Palette.Signal
-            online -> R.string.state_live to Palette.Signal
+            running && fixStatus == "gps_off" -> R.string.fix_gps_off to Palette.Ember
+            running && fixStatus == "no_fix" -> R.string.fix_no_fix to Palette.Ember
+            running && fixStatus == "last_known" -> R.string.fix_last_known to Palette.Ember
+            running && online && parked && hasFix -> R.string.state_parked to Palette.Signal
+            online && hasFix -> R.string.state_live to Palette.Signal
+            running && !hasFix -> R.string.fix_no_fix to Palette.Ember
             else -> R.string.state_offline to Palette.Ember
         }
         Row(Modifier.align(Alignment.Start).padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(8.dp).background(stateColor, CircleShape))
             Spacer(Modifier.width(8.dp))
             Text(stringResource(stateText), color = stateColor, style = MaterialTheme.typography.bodyMedium)
+        }
+        if (running && (fixStatus == "no_fix" || fixStatus == "gps_off")) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(if (fixStatus == "gps_off") R.string.fix_gps_off_hint else R.string.fix_no_fix_hint),
+                color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.align(Alignment.Start),
+            )
         }
         if (ctx.bikeApp.prefs.isTracker) {
             Spacer(Modifier.height(8.dp))
@@ -120,7 +136,7 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             )
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
 
         if (!permsOk) {
             PermissionStepCard(
@@ -136,6 +152,10 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 idleLabel = if (vm.mode == MODE_AUTO) R.string.ring_auto_wait else R.string.ring_start,
                 onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); vm.setTracking(!running) },
             )
+            if (running && prefs.trackingStartedAtMs > 0) {
+                Spacer(Modifier.height(10.dp))
+                TrackingTimer(startedAtMs = prefs.trackingStartedAtMs)
+            }
             if (always) {
                 Spacer(Modifier.height(12.dp))
                 Text(stringResource(R.string.always_hint), color = Palette.Muted, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
@@ -211,13 +231,13 @@ private fun StatusRing(running: Boolean, offline: Boolean, always: Boolean, idle
     val pulse by inf.animateFloat(0.97f, 1.03f, infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "pulse")
 
     Box(
-        Modifier.size(240.dp).clickable(
+        Modifier.size(120.dp).clickable(
             enabled = !always, indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onClick,
         ),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.fillMaxSize().graphicsLayer { if (running) { scaleX = pulse; scaleY = pulse } }) {
-            val stroke = 14.dp.toPx()
+            val stroke = 7.dp.toPx()
             val inset = stroke / 2
             drawCircle(color.copy(alpha = 0.07f), radius = size.minDimension / 2)
             drawCircle(color.copy(alpha = 0.22f), radius = size.minDimension / 2 - inset, style = Stroke(stroke))
@@ -233,13 +253,34 @@ private fun StatusRing(running: Boolean, offline: Boolean, always: Boolean, idle
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.PowerSettingsNew, null, tint = color, modifier = Modifier.size(44.dp))
-            Spacer(Modifier.height(8.dp))
+            Icon(Icons.Default.PowerSettingsNew, null, tint = color, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(when { always -> R.string.ring_always; running -> R.string.ring_tracking; else -> idleLabel }),
                 color = if (running) Palette.Text else Palette.Muted, style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
             )
         }
+    }
+}
+
+/** Live "tracking on for HH:MM:SS" timer, shown only while tracking runs. */
+@Composable
+private fun TrackingTimer(startedAtMs: Long) {
+    var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(startedAtMs) {
+        while (true) { delay(1000); nowMs = System.currentTimeMillis() }
+    }
+    val elapsed = (nowMs - startedAtMs).coerceAtLeast(0)
+    val hours = elapsed / 3_600_000
+    val minutes = (elapsed / 60_000) % 60
+    val seconds = (elapsed / 1000) % 60
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(stringResource(R.string.tracking_timer_label), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds),
+            style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center,
+        )
     }
 }
 
