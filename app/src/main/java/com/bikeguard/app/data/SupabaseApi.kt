@@ -362,8 +362,10 @@ class SupabaseApi(private val prefs: Prefs) {
 
     /**
      * Upsert one settings row. [touchUpdated] is true for a Remote edit (marks it as new work for
-     * the tracker) and false when the tracker mirrors its own state back (keeps the old timestamp,
-     * so the Remote phone does not see its own change as "waiting" again).
+     * the tracker). The tracker never calls this any more: it used to mirror its own state back
+     * with touchUpdated = false, but that whole-row upsert could overwrite a Remote edit made
+     * in the same ~30 s window with stale local values, so it now PATCHes only the fields a
+     * remote command actually changed (see patchTrackerSettings).
      */
     suspend fun saveDeviceSettings(dto: DeviceSettingsDto, touchUpdated: Boolean = true): Boolean = try {
         // Built by hand (not the serializer): clearing the schedule must send an explicit null,
@@ -394,6 +396,29 @@ class SupabaseApi(private val prefs: Prefs) {
     /** The tracker calls this after it has applied the Remote phone's settings. */
     suspend fun markSettingsApplied(deviceId: String): Boolean = try {
         val body = buildJsonObject { put("applied_at", java.time.Instant.now().toString()) }.toString()
+        authed {
+            builder("/rest/v1/device_settings?device_id=eq.$deviceId", it)
+                .header("Prefer", "return=minimal").patch(body.toRequestBody(jsonType)).build()
+        }.ok
+    } catch (e: IOException) { false }
+
+    /**
+     * The tracker reports back exactly what a remote command changed — and nothing else.
+     * This used to be a whole-row upsert of this phone's local settings, which could
+     * overwrite a Remote edit made in the same ~30 s window with stale local values
+     * (and then stamp applied_at over it, so the Remote showed "applied" for a value
+     * that had silently reverted). Only the fields the command actually changed are
+     * sent, so a Remote edit to any other field survives intact. updated_at is never
+     * touched here — there is no trigger on device_settings that bumps it — so this
+     * PATCH can neither look like new Remote work nor confuse the applied/waiting
+     * display. applied_at rides along in the same request.
+     */
+    suspend fun patchTrackerSettings(deviceId: String, guardArmed: Boolean?, speedLimitKmh: Int?): Boolean = try {
+        val body = buildJsonObject {
+            guardArmed?.let { put("guard_armed", it) }
+            speedLimitKmh?.let { put("speed_limit_kmh", it) }
+            put("applied_at", java.time.Instant.now().toString())
+        }.toString()
         authed {
             builder("/rest/v1/device_settings?device_id=eq.$deviceId", it)
                 .header("Prefer", "return=minimal").patch(body.toRequestBody(jsonType)).build()

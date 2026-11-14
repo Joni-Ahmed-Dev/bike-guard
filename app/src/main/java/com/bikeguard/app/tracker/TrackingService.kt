@@ -431,9 +431,9 @@ class TrackingService : Service() {
             "live" -> { guard.goLive(15); reevaluateInterval() }
             "siren_on" -> SirenPlayer.start(this, 60)
             "siren_off" -> SirenPlayer.stop(this)
-            "arm" -> { GuardControl.setArmed(this, true); pushSettingsToServer() }
-            "disarm" -> { GuardControl.setArmed(this, false); SirenPlayer.stop(this); pushSettingsToServer() }
-            "set_speed_limit" -> { app.prefs.speedLimitKmh = c.arg?.toIntOrNull() ?: 0; app.prefs.stateDirty = true; pushSettingsToServer() }
+            "arm" -> { GuardControl.setArmed(this, true); pushSettingsToServer(guardArmed = true) }
+            "disarm" -> { GuardControl.setArmed(this, false); SirenPlayer.stop(this); pushSettingsToServer(guardArmed = false) }
+            "set_speed_limit" -> { app.prefs.speedLimitKmh = c.arg?.toIntOrNull() ?: 0; app.prefs.stateDirty = true; pushSettingsToServer(speedLimitKmh = app.prefs.speedLimitKmh) }
             "cancel_sos" -> SosController.cancel(this)
             "mark_serviced" -> app.prefs.markServiced()
             "tracking_start" -> {
@@ -497,30 +497,27 @@ class TrackingService : Service() {
         p.guardScheduleEnd = s.guardScheduleEnd ?: -1
     }
 
-    /** Mirrors this phone's state back to the server after a remote command, without bumping updated_at. */
-    private fun pushSettingsToServer() {
+    /**
+     * Reports back exactly what a remote command changed, nothing more.
+     * The old whole-row mirror upserted all twelve settings from this phone's local
+     * Prefs after every arm/disarm/speed-limit command, so a Remote edit made in the
+     * same ~30 s window could be overwritten with stale local values — and the
+     * applied_at stamp that followed made the Remote show "applied" for a value
+     * that had silently reverted. A field-scoped PATCH cannot do that: only the
+     * field the command actually changed is written (plus applied_at, in the same
+     * request), and every other field stays exactly as the Remote left it.
+     */
+    private fun pushSettingsToServer(guardArmed: Boolean? = null, speedLimitKmh: Int? = null) {
         val p = app.prefs
         scope.launch {
-            // No settings row seen from the server yet: there is nothing to mirror, and an
-            // explicit-null schedule here would wipe a schedule the Remote phone set.
+            // No settings row seen from the server yet: there is nothing to patch, and an
+            // upsert here could wipe a schedule the Remote phone set.
             if (lastSettingsSeenMs == 0L) {
                 runCatching { app.api.markSettingsApplied(p.deviceId) }
                 return@launch
             }
-            val dto = DeviceSettingsDto(
-                deviceId = p.deviceId, mode = p.mode, intervalSec = p.intervalSec,
-                speedLimitKmh = p.speedLimitKmh, guardArmed = p.parkingArmed,
-                autoArm = p.autoArm,
-                sirenOnAlert = p.sirenOnAlert, sosSms = p.sosSms,
-                crashEnabled = p.crashDetection, sosNumber = p.emergencyNumber,
-                serviceKm = p.serviceIntervalKm,
-                guardScheduleStart = p.guardScheduleStart.takeIf { it in 0..23 },
-                guardScheduleEnd = p.guardScheduleEnd.takeIf { it in 0..23 },
-            )
             try {
-                if (app.api.saveDeviceSettings(dto, touchUpdated = false)) {
-                    app.api.markSettingsApplied(p.deviceId)
-                }
+                app.api.patchTrackerSettings(p.deviceId, guardArmed, speedLimitKmh)
             } catch (e: IOException) { /* retried on the next settings poll */ }
         }
     }
