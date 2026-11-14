@@ -44,9 +44,28 @@ class SyncManager(
         return try {
             if (!prefs.deviceRegistered) {
                 val name = "${Build.MANUFACTURER} ${Build.MODEL}".trim()
+                if (!prefs.hasStoredDeviceId) {
+                    // Reinstall / app-data clear wipes the stored device id, so without this
+                    // the phone would mint a fresh random id and register a second device row
+                    // (that is how the four ITEL rows happened). Rejoin the row already
+                    // stamped with this phone's hardware key instead. Offline the lookup
+                    // throws and the flush retries before anything is minted or registered.
+                    prefs.hardwareKey?.let { key ->
+                        api.findDeviceByHardwareKey(key)?.let { prefs.adoptDeviceId(it) }
+                    }
+                }
                 val reg = api.registerDevice(prefs.deviceId, name, prefs.userId)
                 if (!reg.ok) return FlushOutcome(false, "register: ${reg.error}")
                 prefs.deviceRegistered = true
+            }
+            // Stamp this phone's hardware key on its server row, once. On the v1.2.2 ->
+            // v1.2.3 upgrade the row already exists and deviceRegistered is already true,
+            // so this — not the branch above — is what links the live row to the phone;
+            // without it the next reinstall would still create a new row. A failed stamp
+            // (e.g. migration 0008 is not applied yet) only retries on the next flush
+            // and never fails the upload below.
+            prefs.hardwareKey?.let { key ->
+                if (!prefs.hardwareKeyStamped && api.stampHardwareKey(prefs.deviceId, key)) prefs.hardwareKeyStamped = true
             }
             val ownerId = prefs.userId
             var ok = true

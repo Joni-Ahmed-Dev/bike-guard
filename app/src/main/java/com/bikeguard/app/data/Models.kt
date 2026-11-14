@@ -65,6 +65,23 @@ enum class UploadResult { OK, RETRY, REJECTED }
 fun isoToMs(s: String): Long =
     runCatching { OffsetDateTime.parse(s).toInstant().toEpochMilli() }.getOrDefault(0L)
 
+/**
+ * The device the Remote watches and sends commands to: among the owner's other
+ * device rows, the one with the most recent last_seen. Rows with no last_seen
+ * (registered but never seen, so no locations) are ignored when any row has
+ * been seen — a tracker that re-registers gets a new row, and the Remote must
+ * follow the live one, not the first-created one.
+ * Falls back to the first other row when nothing has ever been seen (a brand
+ * new tracker), and to the first row when this phone is the only device.
+ */
+fun pickActiveDevice(devices: List<DeviceDto>, ownDeviceId: String): DeviceDto? {
+    val others = devices.filter { it.id != null && it.id != ownDeviceId }
+    if (others.isEmpty()) return devices.firstOrNull { it.id != null }
+    val seen = others.filter { !it.lastSeen.isNullOrBlank() }
+    if (seen.isEmpty()) return others.firstOrNull()
+    return seen.maxByOrNull { isoToMs(it.lastSeen.orEmpty()) }
+}
+
 @Serializable
 data class TripDto(
     @SerialName("trip_no") val tripNo: Int,

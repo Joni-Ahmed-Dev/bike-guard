@@ -143,6 +143,31 @@ class SupabaseApi(private val prefs: Prefs) {
         ApiResult(r.ok, r.error)
     } catch (e: IOException) { ApiResult(false, ioReason(e)) }
 
+    /** The device id already registered under this phone's hardware key (migration 0008),
+     *  or null when no row has this key yet. Also null when the server could not be read
+     *  (e.g. the 0008 column is not applied yet): the caller then registers normally and
+     *  the stamp below retries later, so tracking is never blocked on the lookup.
+     *  Throws IOException when offline, so the caller retries before minting a new id. */
+    suspend fun findDeviceByHardwareKey(hardwareKey: String): String? {
+        val q = "/rest/v1/devices?hardware_key=eq.${URLEncoder.encode(hardwareKey, "UTF-8")}" +
+            "&select=id&order=created_at.asc&limit=1"
+        val r = authed { builder(q, it).get().build() }
+        if (!r.ok) return null
+        return runCatching { json.decodeFromString(ListSerializer(DeviceDto.serializer()), r.body) }.getOrNull()?.firstOrNull()?.id
+    }
+
+    /** Stamps this phone's hardware key on its server device row (migration 0008), so a
+     *  later reinstall can find the row again. Idempotent: stamping the same key twice
+     *  changes nothing. False when offline or when the server refuses it (e.g. the 0008
+     *  migration is not applied yet, or another row already owns this key). */
+    suspend fun stampHardwareKey(deviceId: String, hardwareKey: String): Boolean = try {
+        val body = buildJsonObject { put("hardware_key", hardwareKey) }.toString()
+        authed {
+            builder("/rest/v1/devices?id=eq.$deviceId", it)
+                .header("Prefer", "return=minimal").patch(body.toRequestBody(jsonType)).build()
+        }.ok
+    } catch (e: IOException) { false }
+
     /** Throws IOException when offline; returns null on an HTTP error. */
     suspend fun listDevices(): List<DeviceDto>? {
         val r = authed { builder("/rest/v1/devices?select=id,name,last_seen,armed,odometer_km,next_service_km,speed_limit_kmh&order=created_at.asc", it).get().build() }

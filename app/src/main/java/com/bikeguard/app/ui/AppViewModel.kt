@@ -9,11 +9,13 @@ import androidx.lifecycle.viewModelScope
 import com.bikeguard.app.BikeGuardApp
 import com.bikeguard.app.R
 import com.bikeguard.app.data.AuthResult
+import com.bikeguard.app.data.DeviceDto
 import com.bikeguard.app.data.DeviceSettingsDto
 import com.bikeguard.app.data.MODE_ALWAYS
 import com.bikeguard.app.data.MODE_AUTO
 import com.bikeguard.app.data.ROLE_REMOTE
 import com.bikeguard.app.data.isoToMs
+import com.bikeguard.app.data.pickActiveDevice
 import com.bikeguard.app.tracker.AutoMode
 import com.bikeguard.app.tracker.TrackerState
 import com.bikeguard.app.tracker.TrackingControl
@@ -40,6 +42,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var settingsNote by mutableStateOf<String?>(null); private set
     /** Last server settings row, so Settings shows the server's values, not this phone's stale defaults. */
     var remoteSettings by mutableStateOf<DeviceSettingsDto?>(null); private set
+    /** The bike device the Remote is currently watching (freshest last_seen), for Settings. */
+    var watchedDevice by mutableStateOf<DeviceDto?>(null); private set
 
     /** The device the Remote phone's settings target (the bike), or this phone when unset. */
     val settingsTargetId get() = app.prefs.remoteTargetDeviceId.ifBlank { app.prefs.deviceId }
@@ -174,6 +178,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     /** Reads the server row so the Remote screen can show applied / waiting. */
     fun loadRemoteSettings() {
         viewModelScope.launch {
+            // Resolve the watched device first: if the tracker re-registered,
+            // the stored target may point at a dead row. This also heals
+            // remote_target for the settings/commands path even when the
+            // Dashboard was never opened in this session.
+            try {
+                app.api.listDevices()?.let { list ->
+                    pickActiveDevice(list, app.prefs.deviceId)?.let { active ->
+                        watchedDevice = active
+                        active.id?.let { app.prefs.remoteTargetDeviceId = it }
+                    }
+                }
+            } catch (e: Exception) { }
             val s = try { app.api.getDeviceSettings(settingsTargetId) } catch (e: Exception) { null }
             if (s == null) { settingsApplied = null; return@launch }
             remoteSettings = s

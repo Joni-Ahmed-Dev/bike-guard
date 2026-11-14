@@ -2,6 +2,7 @@ package com.bikeguard.app.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.provider.Settings
 import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -16,7 +17,7 @@ const val ROLE_TRACKER = "tracker"
 const val ROLE_REMOTE = "remote"
 
 /** Tokens and settings. Encrypted with the Android Keystore; falls back to plain prefs only if the Keystore is broken. */
-class Prefs(context: Context) {
+class Prefs(private val context: Context) {
     private val sp: SharedPreferences = try {
         val key = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
         EncryptedSharedPreferences.create(
@@ -41,11 +42,41 @@ class Prefs(context: Context) {
         get() = sp.getString("email", null)
         set(v) = sp.edit { putString("email", v) }
 
-    /** Generated locally so the phone can start recording before it ever reaches the server. */
-    val deviceId: String
+    /** Hardware-stable key for this phone: Settings.Secure.ANDROID_ID. Unlike the random
+     *  device id below it survives an uninstall and an app-data clear (same app, same
+     *  phone, same signing key), so after a reinstall the phone can find its old server
+     *  row instead of registering a second one. Needs no permission. Null when Android
+     *  has none; the well-known broken value 9774d56d682e549c counts as absent. A factory
+     *  reset changes it, so it is a rejoin key, not a forever identity. */
+    val hardwareKey: String?
+        get() = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+            ?.takeIf { it.isNotBlank() && it != "9774d56d682e549c" }
+
+    /** The server device row this phone uploads under. Generated locally so the phone can start recording before it ever reaches the server.
+     *  Stored in EncryptedSharedPreferences ("device_id"): an app update keeps it, but an
+     *  uninstall or app-data clear wipes it — that wipe is what created the duplicate
+     *  device rows, because the next launch minted a fresh random UUID. */
+    var deviceId: String
         get() = sp.getString("device_id", null) ?: UUID.randomUUID().toString().also { id ->
             sp.edit { putString("device_id", id) }
         }
+        set(v) = sp.edit { putString("device_id", v) }
+    /** True when an earlier run stored a device id. Checked BEFORE reading [deviceId],
+     *  whose getter would mint a fresh random id and hide the fact that none was stored. */
+    val hasStoredDeviceId: Boolean get() = sp.contains("device_id")
+    /** Point this phone at an existing server row (found by [hardwareKey]) and forget the
+     *  unregistered id minted since the reinstall, if any. Registration runs again right
+     *  after, so the adopted row is re-registered (a no-op upsert) instead of orphaned. */
+    fun adoptDeviceId(id: String) {
+        deviceId = id
+        deviceRegistered = false
+    }
+    /** True once this phone's hardware key has been stamped on its server device row
+     *  (devices.hardware_key, migration 0008). False until the stamp succeeds, so a
+     *  failed stamp — e.g. the migration is not applied yet — retries on the next flush. */
+    var hardwareKeyStamped: Boolean
+        get() = sp.getBoolean("hardware_key_stamped", false)
+        set(v) = sp.edit { putBoolean("hardware_key_stamped", v) }
     var deviceRegistered: Boolean
         get() = sp.getBoolean("device_registered", false)
         set(v) = sp.edit { putBoolean("device_registered", v) }

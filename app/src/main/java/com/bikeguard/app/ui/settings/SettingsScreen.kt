@@ -37,10 +37,13 @@ import com.bikeguard.app.data.MODE_ALWAYS
 import com.bikeguard.app.data.MODE_AUTO
 import com.bikeguard.app.data.MODE_MANUAL
 import com.bikeguard.app.data.Perms
+import com.bikeguard.app.data.isoToMs
 import com.bikeguard.app.tracker.AutoMode
 import com.bikeguard.app.tracker.Notifier
 import com.bikeguard.app.ui.AppViewModel
+import com.bikeguard.app.ui.agoText
 import com.bikeguard.app.ui.openBatterySettings
+import com.bikeguard.app.ui.rememberNow
 import com.bikeguard.app.ui.diagnostics.DiagnosticsScreen
 import com.bikeguard.app.ui.theme.Palette
 import com.bikeguard.app.ui.theme.Panel
@@ -51,6 +54,7 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
     val prefs = ctx.bikeApp.prefs
+    val now = rememberNow()
     val segColors = SegmentedButtonDefaults.colors(
         activeContainerColor = Palette.Ember.copy(alpha = 0.18f), activeContentColor = Palette.Ember,
         activeBorderColor = Palette.Ember, inactiveContainerColor = Color.Transparent,
@@ -156,11 +160,24 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             Panel(Modifier.fillMaxWidth()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
+                        val watched = vm.watchedDevice
                         Text(
-                            stringResource(R.string.settings_target, vm.settingsTargetId.take(8)),
+                            stringResource(R.string.settings_target, watched?.name ?: vm.settingsTargetId.take(8)),
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Spacer(Modifier.height(2.dp))
+                        // Which device row is being watched: model + short id + last seen,
+                        // so a re-registered tracker is visible here instead of a
+                        // silent stale target.
+                        watched?.let { d ->
+                            val seenMs = d.lastSeen?.let { isoToMs(it) } ?: 0L
+                            Text(
+                                (d.id?.take(8) ?: "") +
+                                    if (seenMs > 0) " · " + stringResource(R.string.stat_updated) + " " + agoText(ctx, seenMs, now) else "",
+                                color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                        }
                         Text(
                             when (vm.settingsApplied) {
                                 true -> stringResource(R.string.sync_applied)

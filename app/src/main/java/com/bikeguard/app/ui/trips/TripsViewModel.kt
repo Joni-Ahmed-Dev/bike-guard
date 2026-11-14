@@ -10,6 +10,7 @@ import com.bikeguard.app.BikeGuardApp
 import com.bikeguard.app.data.DeviceDto
 import com.bikeguard.app.data.PointDto
 import com.bikeguard.app.data.TripDto
+import com.bikeguard.app.data.pickActiveDevice
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.IOException
@@ -56,9 +57,11 @@ class TripsViewModel(application: Application) : AndroidViewModel(application) {
                     error = true; trips = null
                 } else {
                     devices = list
-                    if (selectedId == null || list.none { it.id == selectedId }) {
-                        selectedId = (list.firstOrNull { it.id != app.prefs.deviceId } ?: list.firstOrNull())?.id
-                    }
+                    // Follow the live row on every load, like the Viewer: a
+                    // re-registered tracker gets a new row, and the first-created
+                    // row would show an empty trip list.
+                    val activeId = pickActiveDevice(list, app.prefs.deviceId)?.id
+                    if (activeId != selectedId) { selectedId = activeId; trips = null }
                     selectedId?.let { id ->
                         val t = app.api.trips(id, Instant.now().minus(30, ChronoUnit.DAYS).toString())
                         if (t == null) { error = true; trips = null } else { trips = t; refreshTodayDistance() }

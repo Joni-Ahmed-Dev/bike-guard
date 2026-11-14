@@ -14,6 +14,7 @@ import com.bikeguard.app.data.DeviceDto
 import com.bikeguard.app.data.GeofenceDto
 import com.bikeguard.app.data.LocationDto
 import com.bikeguard.app.data.RtEvent
+import com.bikeguard.app.data.pickActiveDevice
 import com.bikeguard.app.tracker.TrackingService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
@@ -86,7 +87,17 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
                 loaded = true
                 connectionIssue = false
             }
-            is RtEvent.Dev -> e.dev.id?.let { id -> devices = devices.map { if (it.id == id) e.dev else it } }
+            is RtEvent.Dev -> e.dev.id?.let { id ->
+                // Keep the last_seen we already have when the event carries none,
+                // or the live row would look unseen and lose the re-resolve below.
+                devices = devices.map { old ->
+                    if (old.id == id) e.dev.copy(lastSeen = e.dev.lastSeen ?: old.lastSeen) else old
+                }
+                // A tracker re-registering appears as a new row: follow the live one.
+                pickActiveDevice(devices, app.prefs.deviceId)?.id?.let { activeId ->
+                    if (activeId != selectedId) select(activeId)
+                }
+            }
             is RtEvent.Ev -> Unit // alerts are handled by the Alerts screen
         }
     }
@@ -106,9 +117,16 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
             connectionIssue = false
             devices = list
             devicesLoaded = true
-            if (selectedId == null || list.none { it.id == selectedId }) {
-                selectedId = (list.firstOrNull { it.id != app.prefs.deviceId } ?: list.firstOrNull())?.id
-                selectedId?.let { app.prefs.remoteTargetDeviceId = it }
+            // Re-resolve on every load, not only at login: when the tracker
+            // re-registers it gets a new row, and the Remote must follow the
+            // live one (most recent last_seen), not the first-created one.
+            // A manual chip tap still works for the moment, but the next
+            // poll follows the live row again.
+            val activeId = pickActiveDevice(list, app.prefs.deviceId)?.id
+            if (activeId != null) {
+                if (activeId != selectedId) select(activeId)
+            } else if (list.isEmpty()) {
+                selectedId = null
             }
         } catch (e: IOException) {
             connectionIssue = true
@@ -187,6 +205,9 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
     // ---------- remote control ----------
 
     private var sendJob: Job? = null
+    /** Id of the last sent command whose note is still "sent, not confirmed", or null. */
+    private var queuedCmdId: Long? = null
+    private var queuedExpiryJob: Job? = null
 
     /**
      * A tracking switch tap that has been sent but not yet confirmed by the tracker's
@@ -225,10 +246,30 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
                     commandNote = R.string.cmd_failed; return@launch
                 }
                 commandNote = R.string.cmd_sent
+                // A command addressed to a device that is no longer watched must
+                // not sit as "sent, not confirmed" forever: once its freshness
+                // window has passed the tracker can never pick it up, so show
+                // it as expired instead of looking stuck.
+                queuedExpiryJob?.cancel()
+                queuedCmdId = cid
+                queuedExpiryJob = viewModelScope.launch {
+                    delay(TrackingService.freshWindowMs(type))
+                    if (queuedCmdId != cid) return@launch
+                    val st = try { app.api.commandStatus(cid) } catch (e: IOException) { null }
+                    if (st == "done") {
+                        if (trackingTo != null) trackingPendingTo = null
+                        commandNote = R.string.cmd_done
+                    } else {
+                        if (trackingTo != null) trackingPendingTo = null
+                        commandNote = R.string.cmd_expired
+                    }
+                    queuedCmdId = null
+                }
                 repeat(12) {                          // wait up to ~36 s for the tracker to confirm
                     delay(3_000)
                     val st = try { app.api.commandStatus(cid) } catch (e: IOException) { null }
                     if (st == "done") {
+                        queuedCmdId = null; queuedExpiryJob?.cancel()
                         if (trackingTo != null) trackingPendingTo = null
                         // Only a confirmed command changes the siren state, never the send itself.
                         if (type == "siren_on") sirenOn = true
@@ -236,6 +277,7 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
                         commandNote = R.string.cmd_done; return@launch
                     }
                     if (st == "expired") {
+                        queuedCmdId = null; queuedExpiryJob?.cancel()
                         if (trackingTo != null) trackingPendingTo = null
                         commandNote = R.string.cmd_expired; return@launch
                     }
