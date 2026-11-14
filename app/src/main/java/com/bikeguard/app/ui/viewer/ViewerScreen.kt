@@ -91,7 +91,6 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
         modifier = modifier,
         scaffoldState = scaffoldState,
         sheetPeekHeight = PEEK,
-        sheetGesturesEnabled = true,
         containerColor = Palette.Ink,
         sheetContainerColor = Palette.Surface,
         sheetContentColor = Palette.Text,

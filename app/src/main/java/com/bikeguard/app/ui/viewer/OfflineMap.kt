@@ -28,8 +28,8 @@ object OfflineMap {
             val mgr = OfflineManager.getInstance(ctx)
             // Reuse the existing region instead of creating a duplicate on every tap.
             mgr.listOfflineRegions(object : OfflineManager.ListOfflineRegionsCallback {
-                override fun onList(regions: Array<OfflineRegion>) {
-                    val existing = regions.firstOrNull {
+                override fun onList(regions: Array<OfflineRegion>?) {
+                    val existing = regions?.firstOrNull {
                         runCatching { String(it.metadata, Charsets.UTF_8) }.getOrNull() == METADATA
                     }
                     if (existing != null) {

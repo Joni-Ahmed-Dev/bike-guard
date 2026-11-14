@@ -105,7 +105,7 @@ object Notifier {
      */
     private fun recreateChannel(ctx: Context, id: String, nameRes: Int, importance: Int, ringtoneUri: String) {
         val nm = ctx.getSystemService(NotificationManager::class.java)
-        nm.deleteChannel(id)
+        nm.deleteNotificationChannel(id)
         nm.createNotificationChannel(buildChannel(ctx, id, nameRes, importance, ringtoneUri))
     }
 
