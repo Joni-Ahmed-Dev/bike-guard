@@ -184,7 +184,10 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                                 err == "no internet" -> ctx.getString(R.string.sync_err_no_internet)
                                 err == "timed out" -> ctx.getString(R.string.sync_err_timeout)
                                 err == "signed out" -> ctx.getString(R.string.sync_err_signed_out)
-                                err.startsWith("server ") -> ctx.getString(R.string.sync_err_server, err.removePrefix("server ").trim())
+                                err.contains("server ") -> ctx.getString(
+                                    R.string.sync_err_server,
+                                    err.substringAfter("server ").substringBefore(":").substringBefore(" ").trim(),
+                                )
                                 else -> ctx.getString(R.string.sync_err_no_internet)
                             }
                             testing = false

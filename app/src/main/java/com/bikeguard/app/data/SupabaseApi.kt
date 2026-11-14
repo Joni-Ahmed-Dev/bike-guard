@@ -45,9 +45,8 @@ class SupabaseApi(private val prefs: Prefs) {
     /** An upload's outcome: the queue decision, and the local failure reason when it must retry. */
     data class UploadOutcome(val result: UploadResult, val error: String? = null)
 
-    private class Resp(val code: Int, val body: String) {
+    private class Resp(val code: Int, val body: String, val error: String?) {
         val ok get() = code in 200..299
-        val error: String? get() = if (ok) null else "server $code"
     }
 
     private fun builder(path: String, token: String?) = Request.Builder()
@@ -60,11 +59,27 @@ class SupabaseApi(private val prefs: Prefs) {
         if (e is java.net.SocketTimeoutException) "timed out" else "no internet"
 
     private suspend fun exec(r: Request): Resp = withContext(Dispatchers.IO) {
-        http.newCall(r).execute().use { resp -> Resp(resp.code, resp.body?.string().orEmpty()) }
+        http.newCall(r).execute().use { resp ->
+            val body = resp.body?.string().orEmpty()
+            // Keep the server's own message: it says exactly why a 403
+            // happened (which policy, bad JWT, missing table), and the
+            // diagnostics screen and Worker report carry it to Muse.
+            val err = if (resp.code in 200..299) null else "server ${resp.code}" +
+                errorText(body).takeIf { it.isNotBlank() && it != "Request failed" }
+                    ?.let { ": ${it.take(120).replace('\n', ' ').replace('\r', ' ')}" }.orEmpty()
+            Resp(resp.code, body, err)
+        }
     }
 
     private suspend fun authed(make: (String) -> Request): Resp {
-        var resp = exec(make(prefs.accessToken.orEmpty()))
+        // Never send an empty Bearer token: PostgREST treats it as anonymous
+        // and RLS rejects the row with 403 instead of asking for a refresh.
+        var token = prefs.accessToken.orEmpty()
+        if (token.isBlank()) {
+            if (!refresh()) return Resp(401, "", "server 401")
+            token = prefs.accessToken.orEmpty()
+        }
+        var resp = exec(make(token))
         if (resp.code == 401 && refresh()) resp = exec(make(prefs.accessToken.orEmpty()))
         return resp
     }

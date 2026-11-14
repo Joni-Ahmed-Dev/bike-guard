@@ -45,7 +45,7 @@ class SyncManager(
             if (!prefs.deviceRegistered) {
                 val name = "${Build.MANUFACTURER} ${Build.MODEL}".trim()
                 val reg = api.registerDevice(prefs.deviceId, name, prefs.userId)
-                if (!reg.ok) return FlushOutcome(false, reg.error)
+                if (!reg.ok) return FlushOutcome(false, "register: ${reg.error}")
                 prefs.deviceRegistered = true
             }
             val ownerId = prefs.userId
@@ -60,7 +60,7 @@ class SyncManager(
                 val up = api.upload(batch.map { it.toDto(prefs.deviceId, ownerId) })
                 when (up.result) {
                     UploadResult.OK, UploadResult.REJECTED -> dao.delete(batch.map { it.id })
-                    UploadResult.RETRY -> { fail(up.error); break }
+                    UploadResult.RETRY -> { fail("upload: ${up.error}"); break }
                 }
             }
             // alerts (tamper, theft, crash ...) upload even when the locations failed
@@ -70,7 +70,7 @@ class SyncManager(
                 val up = api.uploadEvents(batch.map { it.toDto(prefs.deviceId, ownerId) })
                 when (up.result) {
                     UploadResult.OK, UploadResult.REJECTED -> events.delete(batch.map { it.id })
-                    UploadResult.RETRY -> { fail(up.error); break }
+                    UploadResult.RETRY -> { fail("events: ${up.error}"); break }
                 }
             }
             // mirror armed / odometer / limits to the server so the Viewer can show them
@@ -82,7 +82,7 @@ class SyncManager(
                     speedLimitKmh = prefs.speedLimitKmh,
                 )
                 val res = api.patchDeviceState(prefs.deviceId, patch)
-                if (res.ok) prefs.stateDirty = false else fail(res.error)
+                if (res.ok) prefs.stateDirty = false else fail("patch: ${res.error}")
             }
             FlushOutcome(ok, error)
         } catch (e: IOException) {

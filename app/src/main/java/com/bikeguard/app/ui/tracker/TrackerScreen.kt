@@ -222,7 +222,10 @@ private fun syncReasonText(reason: String): String = when {
     reason == "no internet" -> stringResource(R.string.sync_err_no_internet)
     reason == "timed out" -> stringResource(R.string.sync_err_timeout)
     reason == "signed out" -> stringResource(R.string.sync_err_signed_out)
-    reason.startsWith("server ") -> stringResource(R.string.sync_err_server, reason.removePrefix("server ").trim())
+    reason.contains("server ") -> stringResource(
+        R.string.sync_err_server,
+        reason.substringAfter("server ").substringBefore(":").substringBefore(" ").trim(),
+    )
     else -> reason
 }
 
