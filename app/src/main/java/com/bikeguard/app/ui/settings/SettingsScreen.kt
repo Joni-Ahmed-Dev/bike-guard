@@ -102,14 +102,17 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         else { autoDenied = false; vm.updateMode(m) }
     }
 
+    // Diagnostics is a full screen of its own: it must NOT be nested inside the
+    // scrollable settings Column, or Compose measures its own vertical scroll
+    // with infinite height and crashes (tap Diagnostics -> app exits).
+    if (showDiagnostics) {
+        DiagnosticsScreen(onBack = { showDiagnostics = false }, Modifier.fillMaxSize())
+        return
+    }
     Column(
         modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        if (showDiagnostics) {
-            DiagnosticsScreen(onBack = { showDiagnostics = false }, Modifier.fillMaxSize())
-            return@Column
-        }
         Text(stringResource(R.string.tab_settings), style = MaterialTheme.typography.headlineMedium)
 
         // ---- diagnostics: what is happening inside the app, and a report to Muse ----
