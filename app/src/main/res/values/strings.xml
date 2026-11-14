@@ -295,7 +295,7 @@
     <string name="diag_hint">This report goes to the diagnostics server so the app problem can be seen without a screenshot. No location is sent.</string>
     <string name="dash_tracking_guard_note">Tracking stays on while the guard is armed</string>
     <string name="route_line_title">Route line</string>
-    <string name="route_line_desc">Draw the bike's route line on the map.</string>
+    <string name="route_line_desc">Draw the route line on the map.</string>
     <string name="channel_general">General notifications</string>
     <string name="notif_sound_title">Notification sounds</string>
     <string name="ringtone_alerts">Alerts ringtone</string>
