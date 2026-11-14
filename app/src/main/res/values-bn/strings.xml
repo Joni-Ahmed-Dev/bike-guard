@@ -152,7 +152,9 @@
     <string name="ctl_service">সার্ভিস হয়েছে</string>
     <string name="share_title">লাইভ লোকেশন শেয়ার</string>
     <string name="share_h">%1$d ঘণ্টা</string>
-    <string name="share_stop">শেয়ার বন্ধ করুন</string>
+    <string name="share_active">চালু লিংক</string>
+    <string name="share_revoke">বাতিল</string>
+    <string name="share_expires">মেয়াদ শেষ %1$s</string>
     <string name="share_no_base">আগে SHARE_BASE_URL সেট করে শেয়ার পেজ ডিপ্লয় করুন (README দেখুন)।</string>
     <string name="share_failed">লিংক তৈরি করা যায়নি</string>
     <string name="share_message">আমার বাইক লাইভ দেখুন (লিংকের মেয়াদ আছে): %1$s</string>

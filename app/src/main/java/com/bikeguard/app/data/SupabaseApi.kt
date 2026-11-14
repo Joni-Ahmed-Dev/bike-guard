@@ -361,10 +361,18 @@ class SupabaseApi(private val prefs: Prefs) {
         }.ok
     }
 
-    suspend fun revokeShareLinks(deviceId: String): Boolean {
+    /** All links for one device, newest first — shown in the Share dialog so each can be revoked alone. */
+    suspend fun listShareLinks(deviceId: String): List<ShareLinkRow>? {
+        val r = authed { builder("/rest/v1/share_links?device_id=eq.$deviceId&select=token,expires_at,created_at,revoked&order=created_at.desc", it).get().build() }
+        return if (r.ok) runCatching { json.decodeFromString(ListSerializer(ShareLinkRow.serializer()), r.body) }.getOrNull() else null
+    }
+
+    /** Revokes ONE link by its token. The old revoke-all (device_id filter) is gone: revoking
+     *  one link must never kill the others (review item #16). */
+    suspend fun revokeShareLink(token: String): Boolean {
         val body = buildJsonObject { put("revoked", true) }.toString()
         return authed {
-            builder("/rest/v1/share_links?device_id=eq.$deviceId&revoked=eq.false", it)
+            builder("/rest/v1/share_links?token=eq.$token", it)
                 .header("Prefer", "return=minimal").patch(body.toRequestBody(jsonType)).build()
         }.ok
     }

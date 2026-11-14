@@ -14,6 +14,7 @@ import com.bikeguard.app.data.DeviceDto
 import com.bikeguard.app.data.GeofenceDto
 import com.bikeguard.app.data.LocationDto
 import com.bikeguard.app.data.RtEvent
+import com.bikeguard.app.data.ShareLinkRow
 import com.bikeguard.app.data.pickActiveDevice
 import com.bikeguard.app.tracker.TrackingService
 import kotlinx.coroutines.Job
@@ -53,6 +54,8 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
     var commandNote by mutableStateOf<Int?>(null); private set
     var sirenOn by mutableStateOf(false); private set
     var geofences by mutableStateOf<List<GeofenceDto>>(emptyList()); private set
+    /** Active share links for the selected device, shown in the Share dialog (v1.2.14). */
+    var shareLinks by mutableStateOf<List<ShareLinkRow>>(emptyList()); private set
 
     val selectedDevice: DeviceDto? get() = devices.firstOrNull { it.id == selectedId }
 
@@ -326,12 +329,29 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
             val token = Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
             val expires = Instant.now().plusSeconds(hours * 3600L).toString()
             val ok = try { app.api.createShareLink(token, id, expires) } catch (e: IOException) { false }
+            if (ok) loadShareLinks()
             onReady(if (ok) BuildConfig.SHARE_BASE_URL.trimEnd('/') + "/#" + token else null)
         }
     }
 
-    fun stopSharing() {
+    /** Active (not revoked, not expired) links for the selected device. */
+    fun loadShareLinks() {
         val id = selectedId ?: return
-        viewModelScope.launch { try { app.api.revokeShareLinks(id) } catch (e: IOException) { } }
+        viewModelScope.launch {
+            try {
+                val now = Instant.now()
+                shareLinks = app.api.listShareLinks(id).orEmpty().filter { row ->
+                    !row.revoked && runCatching { Instant.parse(row.expiresAt) > now }.getOrDefault(true)
+                }
+            } catch (e: IOException) { }
+        }
+    }
+
+    /** Revokes ONE link by its token; the other links keep working (review item #16). */
+    fun revokeShareLink(token: String) {
+        viewModelScope.launch {
+            try { app.api.revokeShareLink(token) } catch (e: IOException) { }
+            loadShareLinks()
+        }
     }
 }

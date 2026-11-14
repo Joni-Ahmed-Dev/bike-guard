@@ -153,7 +153,9 @@
     <string name="ctl_service">Serviced</string>
     <string name="share_title">Share live location</string>
     <string name="share_h">%1$d h</string>
-    <string name="share_stop">Stop sharing</string>
+    <string name="share_active">Active links</string>
+    <string name="share_revoke">Revoke</string>
+    <string name="share_expires">Expires %1$s</string>
     <string name="share_no_base">Set SHARE_BASE_URL and deploy the share page first (see README).</string>
     <string name="share_failed">Couldn’t create the link</string>
     <string name="share_message">Follow my bike live (the link expires): %1$s</string>

@@ -164,6 +164,15 @@ data class ShareLinkDto(
     @SerialName("expires_at") val expiresAt: String,
 )
 
+/** One share-link row as listed in the Share dialog (v1.2.14: per-link revoke). */
+@Serializable
+data class ShareLinkRow(
+    val token: String,
+    @SerialName("expires_at") val expiresAt: String,
+    @SerialName("created_at") val createdAt: String = "",
+    val revoked: Boolean = false,
+)
+
 @Serializable
 data class PushTokenDto(val token: String, @SerialName("device_id") val deviceId: String)
 

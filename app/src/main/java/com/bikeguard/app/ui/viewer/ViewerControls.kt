@@ -30,7 +30,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.bikeguard.app.R
+import com.bikeguard.app.ui.fmtHourMin
 import com.bikeguard.app.ui.theme.Palette
+import java.time.Instant
 
 /** Remote control + tools for the selected bike, shown inside the Viewer's bottom sheet. */
 @Composable
@@ -85,6 +87,7 @@ private fun ControlButton(icon: ImageVector, label: Int, modifier: Modifier, tin
 @Composable
 private fun ShareDialog(vm: ViewerViewModel, onClose: () -> Unit) {
     val ctx = LocalContext.current
+    LaunchedEffect(Unit) { vm.loadShareLinks() }
     AlertDialog(
         onDismissRequest = onClose,
         containerColor = Palette.Surface,
@@ -110,8 +113,25 @@ private fun ShareDialog(vm: ViewerViewModel, onClose: () -> Unit) {
                             }) { Text(stringResource(R.string.share_h, h)) }
                         }
                     }
-                    TextButton(onClick = { vm.stopSharing(); onClose() }) {
-                        Text(stringResource(R.string.share_stop), color = Palette.Danger)
+                    // One row per active link, each revocable alone: revoking one must
+                    // never kill the others (review item #16).
+                    if (vm.shareLinks.isNotEmpty()) {
+                        Text(stringResource(R.string.share_active), style = MaterialTheme.typography.titleSmall)
+                        vm.shareLinks.forEach { link ->
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    stringResource(R.string.share_expires, shareExpiryText(link.expiresAt)),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                TextButton(onClick = { vm.revokeShareLink(link.token) }) {
+                                    Text(stringResource(R.string.share_revoke), color = Palette.Danger)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -119,6 +139,10 @@ private fun ShareDialog(vm: ViewerViewModel, onClose: () -> Unit) {
         confirmButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.close)) } },
     )
 }
+
+/** "HH:mm" expiry for a share link, or the raw value if it cannot be parsed. */
+private fun shareExpiryText(expiresAt: String): String =
+    runCatching { fmtHourMin(Instant.parse(expiresAt).toEpochMilli()) }.getOrNull() ?: expiresAt
 
 @Composable
 private fun LimitDialog(vm: ViewerViewModel, onClose: () -> Unit) {
