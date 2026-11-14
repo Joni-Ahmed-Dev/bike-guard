@@ -101,6 +101,28 @@ class SyncManager(
             prefs.hardwareKey?.let { key ->
                 if (!prefs.hardwareKeyStamped && api.stampHardwareKey(prefs.deviceId, key)) prefs.hardwareKeyStamped = true
             }
+            // Adopt the server's odometer / next-service values once per install, BEFORE
+            // the stateDirty patch below can push local 0s up. A reinstall wipes Prefs
+            // (odometer 0, stateDirty true by default) while the server row still holds
+            // the real values; without this the first flush after a reinstall would
+            // zero the server's odometer. The odometer only grows, so adopt max():
+            // a server value lower than local (e.g. zeroed by the old bug) never
+            // pulls the local odometer backwards. A failed fetch leaves the flag
+            // false and the patch omits the odometer, so nothing is overwritten.
+            if (!prefs.odometerAdopted) {
+                try {
+                    val row = api.listDevices()?.firstOrNull { it.id == prefs.deviceId }
+                    if (row != null) {
+                        val serverOdo = row.odometerKm?.toFloat() ?: 0f
+                        if (serverOdo > prefs.odometerKm) prefs.odometerKm = serverOdo
+                        val serverNext = row.nextServiceKm?.toFloat() ?: 0f
+                        if (serverNext > prefs.nextServiceKm) prefs.nextServiceKm = serverNext
+                        prefs.odometerAdopted = true
+                    }
+                } catch (e: IOException) {
+                    // offline: adopt on the next flush; the patch below omits odometer
+                }
+            }
             val ownerId = prefs.userId
             var ok = true
             var error: String? = null
@@ -136,7 +158,9 @@ class SyncManager(
             if (prefs.stateDirty) {
                 val patch = DeviceStatePatch(
                     armed = prefs.parkingArmed, trackingExpected = prefs.shouldTrack,
-                    odometerKm = prefs.odometerKm.toDouble(),
+                    // Only send the odometer once adopted: a fresh install's local 0
+                    // must never overwrite the server's stored value (v1.2.11).
+                    odometerKm = prefs.odometerKm.toDouble().takeIf { prefs.odometerAdopted },
                     nextServiceKm = prefs.nextServiceKm.takeIf { it > 0f }?.toDouble(),
                     speedLimitKmh = prefs.speedLimitKmh,
                 )

@@ -32,7 +32,10 @@ data class DeviceDto(
 data class DeviceStatePatch(
     val armed: Boolean,
     @SerialName("tracking_expected") val trackingExpected: Boolean,
-    @SerialName("odometer_km") val odometerKm: Double,
+    /** Null = omit from the PATCH (explicitNulls = false). The tracker only sends the
+     *  odometer once it has adopted the server's value (v1.2.11); before that a
+     *  fresh install's local 0 must never overwrite the server's stored odometer. */
+    @SerialName("odometer_km") val odometerKm: Double? = null,
     @SerialName("next_service_km") val nextServiceKm: Double? = null,
     @SerialName("speed_limit_kmh") val speedLimitKmh: Int,
 )

@@ -70,6 +70,8 @@ class Prefs(private val context: Context) {
     fun adoptDeviceId(id: String) {
         deviceId = id
         deviceRegistered = false
+        // A new row means the odometer adopt must run again for that row.
+        odometerAdopted = false
     }
     /** True once this phone's hardware key has been stamped on its server device row
      *  (devices.hardware_key, migration 0008). False until the stamp succeeds, so a
@@ -146,6 +148,16 @@ class Prefs(private val context: Context) {
         stateDirty = true
     }
     fun markServiced() = scheduleService(serviceIntervalKm)
+
+    /** True once this phone has pulled the server's odometer / next-service values
+     *  into Prefs (v1.2.11). A reinstall wipes Prefs (odometer 0, stateDirty true by
+     *  default), so without this the first flush after a reinstall would PATCH
+     *  odometer_km 0 onto the server row and erase the real odometer. The adopt runs
+     *  once per install (reset by [adoptDeviceId]); until it succeeds, the patch
+     *  omits the odometer entirely, so the server value is never overwritten with 0. */
+    var odometerAdopted: Boolean
+        get() = sp.getBoolean("odo_adopted", false)
+        set(v) = sp.edit { putBoolean("odo_adopted", v) }
 
     /** True when the device row on the server is out of date and should be patched on the next sync. */
     var stateDirty: Boolean
