@@ -108,6 +108,8 @@ class SupabaseApi(private val prefs: Prefs) {
     private fun save(a: AuthResponse) {
         prefs.accessToken = a.accessToken
         prefs.refreshToken = a.refreshToken
+        // A fresh token means the session is alive again: any earlier expiry warning is stale.
+        prefs.sessionExpiredPending = false
         a.user?.let { prefs.userId = it.id; prefs.email = it.email }
     }
 
@@ -123,7 +125,13 @@ class SupabaseApi(private val prefs: Prefs) {
             val r = exec(builder("/auth/v1/token?grant_type=refresh_token", null).post(body).build())
             when {
                 r.ok -> { save(json.decodeFromString<AuthResponse>(r.body)); true }
-                r.code == 400 || r.code == 401 -> { prefs.clearSession(); sessionExpired.value = true; false }
+                r.code == 400 || r.code == 401 -> {
+                    // The refresh token was rejected: the session is dead. clearSession()
+                    // stops tracking and disarms the guard, so the owner must be told —
+                    // the flag survives clearSession() and re-posts the warning on the
+                    // next app start if this process dies before the owner sees it.
+                    prefs.clearSession(); prefs.sessionExpiredPending = true; sessionExpired.value = true; false
+                }
                 else -> false
             }
         } catch (e: IOException) { false } catch (e: SerializationException) { false }

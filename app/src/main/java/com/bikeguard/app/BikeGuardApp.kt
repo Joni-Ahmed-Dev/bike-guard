@@ -42,6 +42,19 @@ class BikeGuardApp : Application() {
         diag = DiagReporter(this, prefs, db.pending())
         sync = SyncManager(db.pending(), db.events(), api, prefs, diag, appScope)
         realtime = RealtimeClient(api)
+        // Session expiry (v1.2.12): the refresh token can be rejected while the app sits
+        // in the background, and clearSession() then stops tracking and disarms the guard
+        // with no signal. The ViewModel only sees it when the UI opens, so watch the flag
+        // here in appScope — it outlives screens — and warn on the Tracker phone.
+        appScope.launch {
+            api.sessionExpired.collect { expired ->
+                if (expired && prefs.isTracker) Notifier.sessionExpired(this@BikeGuardApp)
+            }
+        }
+        // If the process died after the expiry, the persisted flag re-posts the warning
+        // on the next start, so it is not lost with the dead process. Same id, so a
+        // re-post just updates the notification already showing.
+        if (prefs.sessionExpiredPending && prefs.isTracker) Notifier.sessionExpired(this)
         // Report the app's state to the diagnostics Worker on every start,
         // so Muse can see the tracker even when Supabase sync is failing.
         appScope.launch { diag.report("app start") }

@@ -303,6 +303,15 @@ class Prefs(private val context: Context) {
     /** The Remote phone never tracks, even if an old install left tracking prefs behind. */
     val shouldTrack: Boolean get() = isLoggedIn && !isRemote && (trackingActive || mode == MODE_ALWAYS || parkingArmed)
 
+    /** True when the session died on its own (refresh token rejected) and the owner
+     *  has not been told yet. Survives clearSession() on purpose: the flag is what
+     *  re-posts the warning notification on the next app start if the process died
+     *  before the owner saw it. Cleared when the owner reaches the sign-in screen
+     *  (endSession) or signs in again. */
+    var sessionExpiredPending: Boolean
+        get() = sp.getBoolean("session_expired_pending", false)
+        set(v) = sp.edit { putBoolean("session_expired_pending", v) }
+
     /** Signs out but keeps this phone's device identity, so a re-login uploads under the same device. */
     fun clearSession() = sp.edit {
         remove("at"); remove("rt"); remove("uid"); remove("email")

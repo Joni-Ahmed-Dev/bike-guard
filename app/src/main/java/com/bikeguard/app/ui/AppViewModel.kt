@@ -17,6 +17,7 @@ import com.bikeguard.app.data.ROLE_REMOTE
 import com.bikeguard.app.data.isoToMs
 import com.bikeguard.app.data.pickActiveDevice
 import com.bikeguard.app.tracker.AutoMode
+import com.bikeguard.app.tracker.Notifier
 import com.bikeguard.app.tracker.TrackerState
 import com.bikeguard.app.tracker.TrackingControl
 import com.bikeguard.app.tracker.TrackingService
@@ -86,6 +87,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         TrackerState.lastFix.value = null
         TrackerState.armed.value = false
         loggedIn = false
+        // The owner is now looking at the sign-in screen, so the session-expired warning
+        // has done its job: clear it (a no-op after an explicit sign-out, when no warning
+        // was ever posted). An explicit sign-out posts nothing — only a silent expiry does.
+        Notifier.clearSessionExpired(app)
+        app.prefs.sessionExpiredPending = false
     }
 
     fun setTracking(on: Boolean) = TrackingControl.set(app, on)

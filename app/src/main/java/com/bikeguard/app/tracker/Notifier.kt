@@ -31,6 +31,37 @@ object Notifier {
         post(ctx, BikeGuardApp.CHANNEL_GENERAL, id, title, text, NotificationCompat.PRIORITY_DEFAULT)
     }
 
+    /** Fixed id for the session-expired warning (1001 tracking, 1002 watchdog, 1003 SOS). */
+    private const val SESSION_EXPIRED_ID = 1004
+
+    /**
+     * Persistent warning that the session died on its own and tracking + guard stopped.
+     * Ongoing (not swipable, no auto-cancel) on the alerts channel: it stays until the
+     * owner opens the app and signs in again, which clears it in endSession. Tracker
+     * phone only — on the Remote phone the session dying loses no protection, it just
+     * cannot see the bike, and the sign-in screen says so when the app opens.
+     */
+    fun sessionExpired(ctx: Context) {
+        createChannels(ctx)
+        if (!Perms.hasNotifications(ctx)) return
+        val open = PendingIntent.getActivity(
+            ctx, SESSION_EXPIRED_ID, Intent(ctx, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val n = NotificationCompat.Builder(ctx, BikeGuardApp.CHANNEL_ALERTS)
+            .setSmallIcon(R.drawable.ic_stat_pin)
+            .setContentTitle(ctx.getString(R.string.session_expired_title))
+            .setContentText(ctx.getString(R.string.session_expired_text))
+            .setContentIntent(open).setOngoing(true).setAutoCancel(false)
+            .setPriority(NotificationCompat.PRIORITY_HIGH).build()
+        ctx.getSystemService(NotificationManager::class.java).notify(SESSION_EXPIRED_ID, n)
+    }
+
+    /** Clears the session-expired warning, e.g. once the owner reached the sign-in screen. */
+    fun clearSessionExpired(ctx: Context) {
+        ctx.getSystemService(NotificationManager::class.java).cancel(SESSION_EXPIRED_ID)
+    }
+
     private fun post(ctx: Context, channel: String, id: Int, title: String, text: String?, priority: Int) {
         val open = PendingIntent.getActivity(
             ctx, id, Intent(ctx, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT

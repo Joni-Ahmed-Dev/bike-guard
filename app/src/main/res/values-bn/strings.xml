@@ -265,6 +265,8 @@
     <string name="sync_err_timeout">সময় শেষ হয়ে গেছে</string>
     <string name="sync_err_server">সার্ভার %1$s</string>
     <string name="sync_err_signed_out">সাইন আউট করা হয়েছে</string>
+    <string name="session_expired_title">সেশন শেষ, ট্র্যাকিং বন্ধ</string>
+    <string name="session_expired_text">ট্র্যাকিং আর গার্ড আবার চালু করতে আবার সাইন ইন করো।</string>
     <string name="sync_test">সংযোগ পরীক্ষা করুন</string>
     <string name="sync_test_checking">পরীক্ষা করা হচ্ছে…</string>
     <string name="sync_test_ok">সংযোগ হয়েছে, ডাটা আপলোড হয়েছে</string>

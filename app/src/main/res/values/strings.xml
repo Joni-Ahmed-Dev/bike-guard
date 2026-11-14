@@ -266,6 +266,8 @@
     <string name="sync_err_timeout">Timed out</string>
     <string name="sync_err_server">Server %1$s</string>
     <string name="sync_err_signed_out">Signed out</string>
+    <string name="session_expired_title">Session expired, tracking stopped</string>
+    <string name="session_expired_text">Sign in again to restart tracking and guard.</string>
     <string name="sync_test">Test connection</string>
     <string name="sync_test_checking">Checking…</string>
     <string name="sync_test_ok">Connected — data uploaded</string>
