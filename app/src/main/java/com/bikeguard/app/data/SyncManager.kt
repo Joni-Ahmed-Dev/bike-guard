@@ -38,23 +38,27 @@ class SyncManager(
     }
 
     /**
-     * Uploads one location batch. A 400/422 splits the batch in halves and retries,
-     * so one bad row cannot wipe the other 99 points: only rows the server rejects
-     * one by one are dropped. A transient failure (5xx / network / 409 re-register)
-     * stops the flush and leaves everything still queued for the next try.
+     * Uploads one queue batch (locations or alerts). A 400/422 splits the batch in halves
+     * and retries, so one bad row cannot wipe the other rows: only rows the server
+     * rejects one by one are dropped. A transient failure (5xx / network / 409
+     * re-register) stops the flush and leaves everything still queued for the next try.
      * @return null when the whole batch is resolved, the retry reason otherwise.
      */
-    private suspend fun uploadLocationsSplit(batch: List<PendingLocation>, ownerId: String?): String? {
-        val stack = ArrayDeque<List<PendingLocation>>()
+    private suspend fun <T> uploadSplit(
+        batch: List<T>,
+        upload: suspend (List<T>) -> SupabaseApi.UploadOutcome,
+        delete: suspend (List<T>) -> Unit,
+    ): String? {
+        val stack = ArrayDeque<List<T>>()
         stack.addLast(batch)
         while (stack.isNotEmpty()) {
             val chunk = stack.removeLast()
-            val up = api.upload(chunk.map { it.toDto(prefs.deviceId, ownerId) })
+            val up = upload(chunk)
             when (up.result) {
-                UploadResult.OK -> dao.delete(chunk.map { it.id })
+                UploadResult.OK -> delete(chunk)
                 UploadResult.REJECTED -> {
                     if (chunk.size == 1) {
-                        dao.delete(chunk.map { it.id }) // this row alone is bad; drop only it
+                        delete(chunk) // this row alone is bad; drop only it
                     } else {
                         val mid = chunk.size / 2
                         stack.addLast(chunk.subList(mid, chunk.size))
@@ -108,18 +112,25 @@ class SyncManager(
             while (true) {
                 val batch = dao.next(100)
                 if (batch.isEmpty()) break
-                val err = uploadLocationsSplit(batch, ownerId)
+                val err = uploadSplit(
+                    batch,
+                    upload = { chunk -> api.upload(chunk.map { it.toDto(prefs.deviceId, ownerId) }) },
+                    delete = { chunk -> dao.delete(chunk.map { it.id }) },
+                )
                 if (err != null) { fail("upload: $err"); break }
             }
-            // alerts (tamper, theft, crash ...) upload even when the locations failed
+            // alerts (tamper, theft, crash ...) upload even when the locations failed.
+            // Same split treatment as locations: one bad alert must not wipe the
+            // whole batch of 50.
             while (true) {
                 val batch = events.next(50)
                 if (batch.isEmpty()) break
-                val up = api.uploadEvents(batch.map { it.toDto(prefs.deviceId, ownerId) })
-                when (up.result) {
-                    UploadResult.OK, UploadResult.REJECTED -> events.delete(batch.map { it.id })
-                    UploadResult.RETRY -> { fail("events: ${up.error}"); break }
-                }
+                val err = uploadSplit(
+                    batch,
+                    upload = { chunk -> api.uploadEvents(chunk.map { it.toDto(prefs.deviceId, ownerId) }) },
+                    delete = { chunk -> events.delete(chunk.map { it.id }) },
+                )
+                if (err != null) { fail("events: $err"); break }
             }
             // mirror armed / odometer / limits to the server so the Viewer can show them
             if (prefs.stateDirty) {
