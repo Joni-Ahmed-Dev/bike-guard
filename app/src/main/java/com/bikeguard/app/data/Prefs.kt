@@ -247,6 +247,34 @@ class Prefs(private val context: Context) {
         get() = sp.getLong("disarm_at_ms", 0L)
         set(v) = sp.edit { putLong("disarm_at_ms", v) }
 
+    /** Guard anchor: the parked position `moved` alerts are measured against.
+     *  Persisted (not just in-memory like Guard.anchor) so a service restart —
+     *  Watchdog revival, reboot, force-stop — does not lose it: without this
+     *  the bike's current position, where the thief may already have taken it,
+     *  would become the new anchor and `moved` would never fire. Null = none saved. */
+    var guardAnchorLat: Double?
+        get() = sp.getString("guard_anchor_lat", null)?.toDoubleOrNull()
+        set(v) = sp.edit { if (v == null) remove("guard_anchor_lat") else putString("guard_anchor_lat", v.toString()) }
+    var guardAnchorLng: Double?
+        get() = sp.getString("guard_anchor_lng", null)?.toDoubleOrNull()
+        set(v) = sp.edit { if (v == null) remove("guard_anchor_lng") else putString("guard_anchor_lng", v.toString()) }
+    /** When the anchor was set, millis since epoch; 0 = none saved. */
+    var guardAnchorAtMs: Long
+        get() = sp.getLong("guard_anchor_at_ms", 0L)
+        set(v) = sp.edit { putLong("guard_anchor_at_ms", v) }
+    /** Save the guard anchor (position + set time) in one call. */
+    fun saveGuardAnchor(lat: Double, lng: Double) {
+        guardAnchorLat = lat
+        guardAnchorLng = lng
+        guardAnchorAtMs = System.currentTimeMillis()
+    }
+    /** Drop the saved guard anchor, e.g. on disarm or sign-out. */
+    fun clearGuardAnchor() {
+        guardAnchorLat = null
+        guardAnchorLng = null
+        guardAnchorAtMs = 0L
+    }
+
     val isTracker: Boolean get() = appRole == ROLE_TRACKER
     val isRemote: Boolean get() = appRole == ROLE_REMOTE
     val isInviteMode: Boolean get() = !viewerInviteCode.isNullOrBlank()
@@ -260,6 +288,9 @@ class Prefs(private val context: Context) {
         remove("at"); remove("rt"); remove("uid"); remove("email")
         putBoolean("tracking_active", false)
         putBoolean("armed", false); putBoolean("state_dirty", true)
+        // Sign-out disarms the guard: the saved anchor must go too, or a
+        // later re-arm at a new spot would measure against the old one.
+        remove("guard_anchor_lat"); remove("guard_anchor_lng"); remove("guard_anchor_at_ms")
         remove("invite_code")
         remove("remote_target") // a stale Remote target must not point at the old account's device
     }

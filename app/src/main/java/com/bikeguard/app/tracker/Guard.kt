@@ -110,11 +110,29 @@ class Guard(private val ctx: Context, private val app: BikeGuardApp) : SensorGua
 
         // parking mode: remember where the bike was parked, alert when it leaves
         if (armed && !armedSeen) {
-            anchor = loc; armedSeen = true
-            // Save the spot so the Remote phone can show "where I parked".
-            app.appScope.launch { runCatching { app.api.saveParkingSpot(app.prefs.deviceId, loc.latitude, loc.longitude) } }
+            // Restore the saved anchor first: after a service restart (Watchdog
+            // revival, reboot, force-stop) the guard is still armed but the
+            // in-memory anchor is gone. Without this the bike's current position —
+            // where the thief may already have taken it — would become the new
+            // anchor and `moved` would never fire. Only when nothing was saved
+            // (first arm at this spot) is the anchor taken from the current fix.
+            val savedLat = prefs.guardAnchorLat
+            val savedLng = prefs.guardAnchorLng
+            if (savedLat != null && savedLng != null) {
+                anchor = Location("guard-anchor").apply {
+                    latitude = savedLat
+                    longitude = savedLng
+                    time = prefs.guardAnchorAtMs
+                }
+            } else {
+                anchor = loc
+                prefs.saveGuardAnchor(loc.latitude, loc.longitude)
+                // Save the spot so the Remote phone can show "where I parked".
+                app.appScope.launch { runCatching { app.api.saveParkingSpot(app.prefs.deviceId, loc.latitude, loc.longitude) } }
+            }
+            armedSeen = true
         }
-        if (!armed && armedSeen) { armedSeen = false; anchor = null }
+        if (!armed && armedSeen) { armedSeen = false; anchor = null; prefs.clearGuardAnchor() }
         if (armed) {
             anchor?.let { a ->
                 val d = loc.distanceTo(a)

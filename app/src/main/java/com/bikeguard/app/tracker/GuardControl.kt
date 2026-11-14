@@ -17,6 +17,11 @@ object GuardControl {
     fun setArmed(ctx: Context, on: Boolean, latch: Boolean = true, local: Boolean = true) {
         val app = ctx.bikeApp
         app.prefs.parkingArmed = on
+        // A disarm drops the saved anchor (every disarm path runs through here:
+        // UI toggle, widget, remote command, server settings sync, schedule
+        // window end), so the next arm re-anchors at the new spot instead of
+        // measuring against where the bike was parked last time.
+        if (!on) app.prefs.clearGuardAnchor()
         if (local) app.prefs.lastGuardChangeMs = System.currentTimeMillis()
         app.prefs.stateDirty = true
         TrackerState.armed.value = on
