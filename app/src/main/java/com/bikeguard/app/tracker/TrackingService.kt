@@ -304,7 +304,7 @@ class TrackingService : Service() {
         val cmds = try { app.api.pendingCommands(app.prefs.deviceId) } catch (e: IOException) { null } ?: return
         for (c in cmds) {
             val id = c.id ?: continue
-            val fresh = System.currentTimeMillis() - isoToMs(c.createdAt.orEmpty()) < 10 * 60_000L
+            val fresh = System.currentTimeMillis() - isoToMs(c.createdAt.orEmpty()) < freshWindowMs(c.type)
             if (fresh) execute(c)
             try { app.api.ackCommand(id, if (fresh) "done" else "expired") } catch (e: IOException) { /* retried next poll */ }
         }
@@ -497,6 +497,18 @@ class TrackingService : Service() {
         const val STOP_SETTLE_MS = 30_000L
         /** After a manual disarm, auto re-arm (and the guard schedule) waits this long. */
         const val DISARM_LATCH_MS = 10 * 60_000L
+        /** A remote command stays executable this long after it was sent. */
+        const val FRESH_COMMAND_MS = 10 * 60_000L
+        /**
+         * Start/arm commands stay executable longer: the Watchdog only runs every 15 minutes,
+         * so a 10-minute window could expire before it ever gets a chance to revive a stopped
+         * tracker (v1.2.1 issue 1). A late start or arm is still what the owner asked for;
+         * a late siren or locate is not, so those keep the short window.
+         */
+        const val FRESH_START_MS = 60 * 60_000L
+        /** How long a command of [type] stays executable after it was sent. */
+        fun freshWindowMs(type: String?): Long =
+            if (type == "tracking_start" || type == "arm") FRESH_START_MS else FRESH_COMMAND_MS
         const val ACTION_POLL = "com.bikeguard.app.POLL_COMMANDS"
 
         /** Safe to call repeatedly; also re-applies a changed interval. Throws if Android forbids a background start. */

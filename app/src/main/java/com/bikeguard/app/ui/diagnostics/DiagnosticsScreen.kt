@@ -32,6 +32,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bikeguard.app.BuildConfig
 import com.bikeguard.app.R
 import com.bikeguard.app.bikeApp
+import com.bikeguard.app.data.ReportOutcome
 import com.bikeguard.app.tracker.TrackerState
 import com.bikeguard.app.ui.agoText
 import com.bikeguard.app.ui.fmtHourMin
@@ -54,6 +55,7 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val now = rememberNow()
     var sending by remember { mutableStateOf(false) }
     var sendResult by remember { mutableStateOf<String?>(null) }
+    var sendOk by remember { mutableStateOf<Boolean?>(null) }
 
     Column(
         modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -117,9 +119,21 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 if (sending) return@Button
                 sending = true
                 sendResult = null
+                sendOk = null
                 scope.launch {
-                    val ok = app.diag.report("manual report")
-                    sendResult = ctx.getString(if (ok) R.string.diag_sent else R.string.diag_failed)
+                    // reportDetailed (not report) so a build without a
+                    // diagnostics token says "not set up in this build"
+                    // instead of blaming the connection.
+                    val outcome = app.diag.reportDetailed("manual report")
+                    sendOk = outcome == ReportOutcome.SENT
+                    sendResult = ctx.getString(
+                        when (outcome) {
+                            ReportOutcome.SENT -> R.string.diag_sent
+                            ReportOutcome.NOT_CONFIGURED -> R.string.diag_not_configured
+                            ReportOutcome.REJECTED -> R.string.diag_rejected
+                            ReportOutcome.FAILED -> R.string.diag_failed
+                        },
+                    )
                     sending = false
                 }
             },
@@ -128,7 +142,7 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         sendResult?.let {
             Text(
                 it,
-                color = if (it == stringResource(R.string.diag_sent)) Palette.Signal else Palette.Danger,
+                color = if (sendOk == true) Palette.Signal else Palette.Danger,
                 style = MaterialTheme.typography.bodyMedium,
             )
         }

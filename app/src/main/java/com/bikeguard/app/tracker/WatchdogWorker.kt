@@ -35,7 +35,7 @@ class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 val cmds = app.api.pendingCommands(app.prefs.deviceId).orEmpty()
                 val freshStart = cmds.any { c ->
                     (c.type == "tracking_start" || c.type == "arm") &&
-                        System.currentTimeMillis() - isoToMs(c.createdAt.orEmpty()) < 10 * 60_000L
+                        System.currentTimeMillis() - isoToMs(c.createdAt.orEmpty()) < TrackingService.freshWindowMs(c.type)
                 }
                 val guardArmed = runCatching { app.api.getDeviceSettings(app.prefs.deviceId)?.guardArmed }.getOrNull() == true
                 freshStart || guardArmed

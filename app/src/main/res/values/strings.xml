@@ -55,6 +55,9 @@
     <string name="perm_loc_body">BikeGuard needs precise GPS location to follow your bike.</string>
     <string name="perm_bg_title">Allow location all the time</string>
     <string name="perm_bg_body">Choose “Allow all the time” so tracking keeps working when the screen is off.</string>
+    <string name="perm_activity_title">Allow physical activity</string>
+    <string name="perm_activity_body">Auto mode notices when the bike starts moving, so tracking can start on its own. Without it, start tracking by tapping the button.</string>
+    <string name="perm_skip">Skip for now</string>
     <string name="grant">Grant access</string>
     <string name="battery_title">Stop Android from killing the tracker</string>
     <string name="battery_body">Disable battery optimization. On Xiaomi, Oppo, Vivo and Samsung phones, also turn on Autostart or Unrestricted battery.</string>
@@ -126,6 +129,7 @@
     <string name="cmd_sent">Sent — waiting for the tracker</string>
     <string name="cmd_done">Done</string>
     <string name="cmd_failed">Couldn’t send</string>
+    <string name="cmd_queued">Sent — the tracker hasn’t confirmed yet</string>
     <string name="ctl_locate">Locate</string>
     <string name="ctl_live">Live mode</string>
     <string name="ctl_siren">Siren</string>
@@ -273,6 +277,7 @@
     <string name="diag_sending">Sending…</string>
     <string name="diag_sent">Report sent</string>
     <string name="diag_failed">Report failed, check connection</string>
+    <string name="diag_rejected">Report rejected by server</string>
     <string name="diag_not_configured">Reporting is not set up in this build</string>
     <string name="diag_account">Account</string>
     <string name="diag_role">Role</string>
@@ -294,6 +299,8 @@
     <string name="diag_failed_short">Failed</string>
     <string name="diag_hint">This report goes to the diagnostics server so the app problem can be seen without a screenshot. No location is sent.</string>
     <string name="dash_tracking_guard_note">Tracking stays on while the guard is armed</string>
+    <string name="dash_tracking_waiting">Waiting for the tracker to confirm…</string>
+    <string name="dash_tracking_offline">Tracker offline — this will apply when the bike reconnects</string>
     <string name="route_line_title">Route line</string>
     <string name="route_line_desc">Draw the route line on the map.</string>
     <string name="channel_general">General notifications</string>

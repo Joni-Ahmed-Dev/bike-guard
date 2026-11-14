@@ -48,6 +48,7 @@ import com.bikeguard.app.bikeApp
 import com.bikeguard.app.data.MODE_ALWAYS
 import com.bikeguard.app.data.MODE_AUTO
 import com.bikeguard.app.data.Perms
+import com.bikeguard.app.tracker.AutoMode
 import com.bikeguard.app.tracker.GuardControl
 import com.bikeguard.app.tracker.TrackerState
 import com.bikeguard.app.ui.AppViewModel
@@ -70,8 +71,16 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         owner.lifecycle.addObserver(o)
         onDispose { owner.lifecycle.removeObserver(o) }
     }
-    val permsOk = remember(tick) { Perms.hasFine(ctx) && Perms.hasBackground(ctx) && Perms.hasNotifications(ctx) }
+    // Session-only: skipping the activity step never blocks the tracker UI, and the
+    // step is offered again on the next launch. Auto start just stays off until granted.
+    var activitySkipped by remember { mutableStateOf(false) }
+    val permsOk = remember(tick, vm.mode, activitySkipped) {
+        Perms.hasFine(ctx) && Perms.hasBackground(ctx) && Perms.hasNotifications(ctx) &&
+            (vm.mode != MODE_AUTO || AutoMode.hasPermission(ctx) || activitySkipped)
+    }
     val batteryOk = remember(tick) { Perms.ignoringBatteryOptimizations(ctx) }
+    // Re-grant path for the non-blocking panel below (the step card is gone once skipped).
+    val activityPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { tick++ }
 
     val running by TrackerState.running.collectAsStateWithLifecycle()
     val online by TrackerState.online.collectAsStateWithLifecycle()
@@ -114,7 +123,12 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(24.dp))
 
         if (!permsOk) {
-            PermissionStepCard(tick = tick, onChanged = { tick++ })
+            PermissionStepCard(
+                tick = tick,
+                onChanged = { tick++ },
+                autoMode = vm.mode == MODE_AUTO,
+                onSkipActivity = { activitySkipped = true; tick++ },
+            )
         } else {
             val haptic = LocalHapticFeedback.current
             StatusRing(
@@ -125,6 +139,18 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             if (always) {
                 Spacer(Modifier.height(12.dp))
                 Text(stringResource(R.string.always_hint), color = Palette.Muted, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
+            }
+            // Non-blocking: Auto mode runs, but only a manual tap can start tracking
+            // until Physical activity is granted. Shown after the step was skipped.
+            if (vm.mode == MODE_AUTO && !AutoMode.hasPermission(ctx)) {
+                Spacer(Modifier.height(12.dp))
+                Panel(Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.auto_perm_needed), style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(6.dp))
+                    Text(stringResource(R.string.perm_activity_body), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(onClick = { activityPerm.launch(Manifest.permission.ACTIVITY_RECOGNITION) }) { Text(stringResource(R.string.grant)) }
+                }
             }
             Spacer(Modifier.height(16.dp))
             Panel(Modifier.fillMaxWidth()) {
@@ -238,26 +264,31 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
     }
 }
 
-private enum class Step { NOTIF, LOCATION, BACKGROUND }
+private enum class Step { NOTIF, LOCATION, BACKGROUND, ACTIVITY }
 
 @Composable
-private fun PermissionStepCard(tick: Int, onChanged: () -> Unit) {
+private fun PermissionStepCard(tick: Int, onChanged: () -> Unit, autoMode: Boolean, onSkipActivity: () -> Unit) {
     val ctx = LocalContext.current
     val notif = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { onChanged() }
     val loc = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { onChanged() }
     val bg = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { onChanged() }
+    val activity = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { onChanged() }
 
     val steps = buildList {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Step.NOTIF)
         add(Step.LOCATION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) add(Step.BACKGROUND)
+        // Physical activity is only needed in Auto mode: it powers the
+        // in-vehicle detection that starts tracking when the bike moves.
+        if (autoMode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) add(Step.ACTIVITY)
     }
-    val done = remember(tick) {
+    val done = remember(tick, autoMode) {
         steps.filter { s ->
             when (s) {
                 Step.NOTIF -> Perms.hasNotifications(ctx)
                 Step.LOCATION -> Perms.hasFine(ctx)
                 Step.BACKGROUND -> Perms.hasBackground(ctx)
+                Step.ACTIVITY -> AutoMode.hasPermission(ctx)
             }
         }.toSet()
     }
@@ -266,6 +297,7 @@ private fun PermissionStepCard(tick: Int, onChanged: () -> Unit) {
         Step.NOTIF -> R.string.perm_notif_title to R.string.perm_notif_body
         Step.LOCATION -> R.string.perm_loc_title to R.string.perm_loc_body
         Step.BACKGROUND -> R.string.perm_bg_title to R.string.perm_bg_body
+        Step.ACTIVITY -> R.string.perm_activity_title to R.string.perm_activity_body
     }
 
     Panel(Modifier.fillMaxWidth()) {
@@ -286,10 +318,17 @@ private fun PermissionStepCard(tick: Int, onChanged: () -> Unit) {
                     Step.NOTIF -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notif.launch(Manifest.permission.POST_NOTIFICATIONS)
                     Step.LOCATION -> loc.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
                     Step.BACKGROUND -> bg.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                    Step.ACTIVITY -> activity.launch(Manifest.permission.ACTIVITY_RECOGNITION)
                 }
             },
             shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(52.dp),
         ) { Text(stringResource(R.string.grant)) }
+        // Denying activity must never trap the user on this card: Auto start just
+        // stays off, tracking can still be started by tapping the button.
+        if (current == Step.ACTIVITY) {
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = onSkipActivity, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.perm_skip)) }
+        }
     }
 }
 

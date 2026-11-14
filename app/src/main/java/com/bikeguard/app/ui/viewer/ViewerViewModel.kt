@@ -14,6 +14,7 @@ import com.bikeguard.app.data.DeviceDto
 import com.bikeguard.app.data.GeofenceDto
 import com.bikeguard.app.data.LocationDto
 import com.bikeguard.app.data.RtEvent
+import com.bikeguard.app.tracker.TrackingService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -187,28 +188,63 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
 
     private var sendJob: Job? = null
 
+    /**
+     * A tracking switch tap that has been sent but not yet confirmed by the tracker's
+     * mirrored flag: the requested value, or null when nothing is outstanding. While
+     * set, the Dashboard shows the requested value plus "waiting for the tracker"
+     * instead of flipping back to the stale mirror (v1.2.1 issue 1).
+     */
+    var trackingPendingTo by mutableStateOf<Boolean?>(null); private set
+
+    fun clearTrackingPending() { trackingPendingTo = null }
+
     fun send(type: String, arg: String? = null) {
         val id = selectedId ?: return
-        if (sendJob?.isActive == true) return // one command at a time; rapid taps don't race
+        if (sendJob?.isActive == true) { commandNote = R.string.cmd_sending; return } // one command at a time; rapid taps don't race
+        val trackingTo = when (type) {
+            "tracking_start" -> true
+            "tracking_stop" -> false
+            else -> null
+        }
+        if (trackingTo != null) {
+            trackingPendingTo = trackingTo
+            // Backstop: a queued command stops being executable after its freshness
+            // window, so the pending state must not outlive it.
+            viewModelScope.launch {
+                delay(TrackingService.freshWindowMs(type))
+                if (trackingPendingTo == trackingTo) trackingPendingTo = null
+            }
+        }
         sendJob = viewModelScope.launch {
             commandNote = R.string.cmd_sending
             try {
                 val cid = app.api.sendCommand(id, type, arg)
-                if (cid == null) { commandNote = R.string.cmd_failed; return@launch }
+                if (cid == null) {
+                    // The server refused the insert: nothing is queued on the tracker side.
+                    if (trackingTo != null) trackingPendingTo = null
+                    commandNote = R.string.cmd_failed; return@launch
+                }
                 commandNote = R.string.cmd_sent
                 repeat(12) {                          // wait up to ~36 s for the tracker to confirm
                     delay(3_000)
                     val st = try { app.api.commandStatus(cid) } catch (e: IOException) { null }
                     if (st == "done") {
+                        if (trackingTo != null) trackingPendingTo = null
                         // Only a confirmed command changes the siren state, never the send itself.
                         if (type == "siren_on") sirenOn = true
                         if (type == "siren_off") sirenOn = false
                         commandNote = R.string.cmd_done; return@launch
                     }
-                    if (st == "expired") { commandNote = R.string.cmd_expired; return@launch }
+                    if (st == "expired") {
+                        if (trackingTo != null) trackingPendingTo = null
+                        commandNote = R.string.cmd_expired; return@launch
+                    }
                 }
-                commandNote = R.string.cmd_failed // no confirmation within ~36 s
+                // Inserted but unconfirmed: the command is queued on the server and the
+                // tracker applies it when it next polls, so this is not a failed send.
+                commandNote = R.string.cmd_queued
             } catch (e: IOException) {
+                if (trackingTo != null) trackingPendingTo = null
                 commandNote = R.string.cmd_failed
             }
         }

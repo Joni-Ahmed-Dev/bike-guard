@@ -55,6 +55,9 @@
     <string name="perm_loc_body">বাইক অনুসরণ করতে BikeGuard-এর সঠিক GPS লোকেশন দরকার।</string>
     <string name="perm_bg_title">সবসময় লোকেশনের অনুমতি দিন</string>
     <string name="perm_bg_body">“সবসময় অনুমতি দিন” বেছে নিন, যাতে স্ক্রিন বন্ধ থাকলেও ট্র্যাকিং চলে।</string>
+    <string name="perm_activity_title">ফিজিক্যাল অ্যাক্টিভিটি চালু করুন</string>
+    <string name="perm_activity_body">বাইক চলতে শুরু করলে অটো মোড তা বুঝে নিজে থেকেই ট্র্যাকিং শুরু করে। এটা না থাকলে বোতাম চেপে ট্র্যাকিং শুরু করতে হবে।</string>
+    <string name="perm_skip">এখন থাক</string>
     <string name="grant">অনুমতি দিন</string>
     <string name="battery_title">Android যেন ট্র্যাকার বন্ধ না করে</string>
     <string name="battery_body">ব্যাটারি অপটিমাইজেশন বন্ধ করুন। Xiaomi, Oppo, Vivo ও Samsung ফোনে Autostart বা Unrestricted battery-ও চালু করুন।</string>
@@ -274,6 +277,7 @@
     <string name="diag_sent">রিপোর্ট পাঠানো হয়েছে</string>
     <string name="diag_failed">রিপোর্ট যায়নি, সংযোগ দেখো</string>
     <string name="diag_not_configured">এই বিল্ডে রিপোর্ট চালু নেই</string>
+    <string name="diag_rejected">সার্ভার রিপোর্ট গ্রহণ করেনি</string>
     <string name="diag_account">অ্যাকাউন্ট</string>
     <string name="diag_role">ভূমিকা</string>
     <string name="diag_role_tracker">ট্র্যাকার</string>
@@ -294,6 +298,9 @@
     <string name="diag_failed_short">ব্যর্থ</string>
     <string name="diag_hint">এই রিপোর্ট ডায়াগনস্টিকস সার্ভারে যায়, যাতে স্ক্রিনশট ছাড়াই অ্যাপের সমস্যা দেখা যায়। কোনো লোকেশন পাঠানো হয় না।</string>
     <string name="dash_tracking_guard_note">গার্ড চালু থাকলে ট্র্যাকিং বন্ধ করা যাবে না</string>
+    <string name="cmd_queued">পাঠানো হয়েছে — ট্র্যাকার এখনো নিশ্চিত করেনি</string>
+    <string name="dash_tracking_waiting">ট্র্যাকার নিশ্চিত করার অপেক্ষায়…</string>
+    <string name="dash_tracking_offline">ট্র্যাকার অফলাইন — বাইক আবার যুক্ত হলে এটি কার্যকর হবে</string>
     <string name="route_line_title">রুটের দাগ</string>
     <string name="route_line_desc">ম্যাপে বাইকের চলার পথের দাগ দেখাবে।</string>
     <string name="channel_general">সাধারণ নোটিফিকেশন</string>

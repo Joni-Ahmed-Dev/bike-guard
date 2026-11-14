@@ -103,7 +103,12 @@ fun DashboardScreen(
         val id = vm.selectedId ?: return@LaunchedEffect
         remoteTrackingOn = null
         while (true) {
-            try { ctx.bikeApp.api.trackingExpected(id)?.let { remoteTrackingOn = it } } catch (e: IOException) { }
+            try {
+                ctx.bikeApp.api.trackingExpected(id)?.let {
+                    remoteTrackingOn = it
+                    if (vm.trackingPendingTo == it) vm.clearTrackingPending()
+                }
+            } catch (e: IOException) { }
             delay(15_000)
         }
     }
@@ -179,13 +184,28 @@ fun DashboardScreen(
                     }
                     Spacer(Modifier.width(12.dp))
                     Switch(
-                        checked = remoteTrackingOn == true,
+                        checked = vm.trackingPendingTo ?: (remoteTrackingOn == true),
                         enabled = remoteTrackingOn != null && device != null,
                         onCheckedChange = { on ->
-                            remoteTrackingOn = on // optimistic; the next poll corrects it if the command fails
+                            remoteTrackingOn = on // optimistic; the pending state holds it until the tracker confirms
                             vm.send(if (on) "tracking_start" else "tracking_stop")
                         },
                         colors = SwitchDefaults.colors(checkedTrackColor = Palette.Ember, checkedThumbColor = Palette.Ink),
+                    )
+                }
+                // A queued switch tap, or a tracker that has gone quiet: say so, instead of
+                // showing a stale ON while nothing can reach the bike (v1.2.1 issue 1).
+                if (vm.trackingPendingTo != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.dash_tracking_waiting),
+                        color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
+                    )
+                } else if (age == null || age >= 900_000L) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.dash_tracking_offline),
+                        color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }

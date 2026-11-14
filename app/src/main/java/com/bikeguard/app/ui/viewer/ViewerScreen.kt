@@ -47,6 +47,14 @@ import org.maplibre.android.geometry.LatLng
 
 private val PEEK = 168.dp
 
+// Issue #3: the sheet's expanded height must be a fixed fraction of the screen, NOT the
+// content height. BottomSheetScaffold derives its Expanded anchor from the measured sheet
+// height (screen height minus content height), so a content-sized sheet could only ever
+// cover ~60% of the screen and its bottom rows sat below the visible area — that is why
+// v1.2.0's "fully expands" claim was false. A fixed fraction makes the Expanded anchor
+// stable from the first layout, independent of content and of the expanded flag below.
+private const val SHEET_EXPANDED_FRACTION = 0.92f
+
 private enum class Status(val label: Int, val color: Color) {
     LIVE(R.string.status_live, Palette.Signal),
     DELAYED(R.string.status_delayed, Palette.Ember),
@@ -102,8 +110,11 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
                 loading = !vm.loaded && vm.selectedId != null, noDevice = vm.devicesLoaded && vm.devices.isEmpty(),
                 vm = vm, readOnly = readOnly, expanded = sheetExpanded,
                 onToggleSheet = {
+                    // Read targetValue, not the settled currentValue: if the sheet is still
+                    // animating toward Expanded, a second tap must collapse it instead of
+                    // re-issuing expand() against a stale value.
                     sheetScope.launch {
-                        if (sheetExpanded) scaffoldState.bottomSheetState.partialExpand()
+                        if (scaffoldState.bottomSheetState.targetValue == SheetValue.Expanded) scaffoldState.bottomSheetState.partialExpand()
                         else scaffoldState.bottomSheetState.expand()
                     }
                 },
@@ -189,9 +200,15 @@ private fun SheetContent(
     // Issue #2: while the sheet is only peeking, its content must NOT be scrollable — a
     // scrollable sheet swallows the drag and the sheet gets stuck halfway. Scrolling turns
     // on only once fully expanded; before that every drag goes to the sheet itself.
+    // Issue #3: the height is a FIXED screen fraction, applied in both states. The old
+    // code let the height follow the content, so expand() could only lift the sheet to
+    // the top of its content (~60% of the screen) and any content taller than that was
+    // unreachable. Now the Expanded anchor is near the top of the screen from the first
+    // layout, and the content scrolls inside that fixed viewport when expanded.
     val scrollState = rememberScrollState()
     Column(
         Modifier.fillMaxWidth()
+            .fillMaxHeight(SHEET_EXPANDED_FRACTION)
             .then(if (expanded) Modifier.verticalScroll(scrollState) else Modifier)
             .padding(horizontal = 20.dp).padding(bottom = 28.dp)
     ) {

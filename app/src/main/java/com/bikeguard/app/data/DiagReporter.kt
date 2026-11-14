@@ -18,7 +18,19 @@ import java.util.concurrent.TimeUnit
  * so Muse can see the tracker's state without asking for screenshots.
  * No location is ever sent: only role, tracking state, queued count, last
  * fix age, last sync error, battery and app version.
- * Best-effort only: never throws, never blocks the caller. */
+ * Best-effort only: never throws, never blocks the caller.
+ *
+ * NOTE (v1.2.1, issue 2): the release build shipped with an empty
+ * DIAG_TOKEN — the CI workflow never passed the DIAG_TOKEN secret into the
+ * build, so BuildConfig.DIAG_TOKEN was "" and [configured] was false, so
+ * [report] returned false before ever touching the network and every tap
+ * on Send Report showed "Failed" even on a perfectly online phone. The
+ * Worker itself was verified live and correct (wrong token -> 403
+ * "forbidden", never a 500). Until the workflow passes DIAG_TOKEN, this
+ * class now at least reports WHY it failed ([ReportOutcome.NOT_CONFIGURED])
+ * instead of blaming the connection. */
+enum class ReportOutcome { SENT, NOT_CONFIGURED, REJECTED, FAILED }
+
 class DiagReporter(
     private val ctx: Context,
     private val prefs: Prefs,
@@ -33,9 +45,28 @@ class DiagReporter(
     val configured: Boolean get() =
         BuildConfig.DIAG_URL.startsWith("http") && BuildConfig.DIAG_TOKEN.isNotBlank()
 
+    /** Outcome of the last [reportDetailed] call; null before any attempt. */
+    var lastOutcome: ReportOutcome? = null
+        private set
+
+    /** HTTP status of the last attempt; 0 when no response was received. */
+    var lastHttpCode: Int = 0
+        private set
+
     /** @return true when the Worker accepted the snapshot. Never throws. */
-    suspend fun report(note: String): Boolean {
-        if (!configured) return false
+    suspend fun report(note: String): Boolean =
+        reportDetailed(note) == ReportOutcome.SENT
+
+    /** Like [report] but says why it failed, so the UI can show the real
+     * reason instead of a generic "check connection". Never throws. */
+    suspend fun reportDetailed(note: String): ReportOutcome {
+        if (!configured) {
+            lastOutcome = ReportOutcome.NOT_CONFIGURED
+            lastHttpCode = 0
+            prefs.lastDiagReportAtMs = System.currentTimeMillis()
+            prefs.lastDiagReportOk = false
+            return ReportOutcome.NOT_CONFIGURED
+        }
         val now = System.currentTimeMillis()
         return try {
             val fix = TrackerState.lastFix.value
@@ -67,14 +98,20 @@ class DiagReporter(
                 .url(BuildConfig.DIAG_URL.trimEnd('/') + "/report?token=" + BuildConfig.DIAG_TOKEN)
                 .post(payload.toRequestBody("application/json; charset=utf-8".toMediaType()))
                 .build()
-            val ok = http.newCall(req).execute().use { it.isSuccessful }
+            val outcome = http.newCall(req).execute().use { resp ->
+                lastHttpCode = resp.code
+                if (resp.isSuccessful) ReportOutcome.SENT else ReportOutcome.REJECTED
+            }
+            lastOutcome = outcome
             prefs.lastDiagReportAtMs = now
-            prefs.lastDiagReportOk = ok
-            ok
+            prefs.lastDiagReportOk = outcome == ReportOutcome.SENT
+            outcome
         } catch (e: Exception) {
+            lastOutcome = ReportOutcome.FAILED
+            lastHttpCode = 0
             prefs.lastDiagReportAtMs = now
             prefs.lastDiagReportOk = false
-            false
+            ReportOutcome.FAILED
         }
     }
 }

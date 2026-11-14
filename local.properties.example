@@ -3,3 +3,8 @@ SUPABASE_URL=https://YOUR-PROJECT.supabase.co
 SUPABASE_ANON_KEY=YOUR_ANON_PUBLIC_KEY
 # Public URL of the share page (GitHub Pages), e.g. https://YOURNAME.github.io/BikeGuard
 SHARE_BASE_URL=
+# Diagnostics Worker token: must match the READ_TOKEN secret on the
+# bikeguard-diag Cloudflare Worker. Also set it as the DIAG_TOKEN secret
+# in the GitHub repo and pass it to the CI build, or the release build
+# ships with an empty token and Send Report always fails (v1.2.0 bug).
+DIAG_TOKEN=
