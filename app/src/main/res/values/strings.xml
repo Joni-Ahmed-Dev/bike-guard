@@ -158,7 +158,6 @@
     <string name="service_in">Service in %1$d km</string>
     <string name="service_overdue">Service overdue</string>
     <string name="close">Close</string>
-    <string name="add">Add</string>
     <string name="set_guard">Anti-theft</string>
     <string name="guard_parking">Parking mode</string>
     <string name="guard_parking_desc">Alerts you if the parked bike is moved or tampered with. Turn it off before you ride.</string>
@@ -232,13 +231,6 @@
     <string name="export_gpx">Export GPX</string>
     <string name="ride_score">Ride score %1$d/100</string>
     <string name="ride_score_hint">%1$d harsh brakes, %2$d%% of the ride over 80 km/h</string>
-    <string name="family_title">Family view-only invite</string>
-    <string name="family_desc">Family can watch the bike live, but cannot change anything.</string>
-    <string name="family_generate">Create invite code</string>
-    <string name="family_code">Invite code: %1$s</string>
-    <string name="family_use">Use an invite code</string>
-    <string name="family_code_hint">Enter the code from the owner’s phone</string>
-    <string name="family_saved">Invite saved — this phone is now view-only</string>
     <string name="schedule_title">Guard schedule</string>
     <string name="schedule_desc">Guard turns on by itself in this window, and off when it ends.</string>
     <string name="schedule_start">Starts at (hour)</string>
@@ -257,9 +249,6 @@
     <string name="pin_label">PIN</string>
     <string name="continue_label">Continue</string>
     <string name="settings_target">Bike: %1$s</string>
-    <string name="invite_mode">View-only (family invite)</string>
-
-    <string name="invite_clear">Remove invite</string>
 
     <string name="sync_last_try">Last try %1$s — %2$s</string>
     <string name="sync_err_no_internet">No internet</string>

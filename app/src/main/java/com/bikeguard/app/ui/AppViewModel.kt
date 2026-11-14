@@ -36,7 +36,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var mode by mutableStateOf(app.prefs.mode); private set
     var intervalSec by mutableStateOf(app.prefs.intervalSec); private set
     var role by mutableStateOf(app.prefs.appRole); private set
-    var inviteCode by mutableStateOf(app.prefs.viewerInviteCode); private set
     /** Remote settings status: true = applied on the bike phone, false = waiting, null = unknown. */
     var settingsApplied by mutableStateOf<Boolean?>(null); private set
     var settingsNote by mutableStateOf<String?>(null); private set
@@ -113,28 +112,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         app.prefs.appRole = ""
         role = ""
         return true
-    }
-
-    fun updateInviteCode(code: String) {
-        val c = code.trim()
-        app.prefs.viewerInviteCode = c.ifBlank { null }
-        inviteCode = app.prefs.viewerInviteCode
-    }
-
-    fun clearInviteCode() {
-        app.prefs.viewerInviteCode = null
-        inviteCode = null
-    }
-
-    /** Creates a family view-only invite code on the server. [onCode] gets it, or null on failure. */
-    fun createFamilyInvite(onCode: (String?) -> Unit) {
-        viewModelScope.launch {
-            val chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-            val rnd = java.security.SecureRandom()
-            val code = (1..8).map { chars[rnd.nextInt(chars.length)] }.joinToString("")
-            val ok = try { app.api.createFamilyInvite(code) } catch (e: Exception) { false }
-            onCode(if (ok) code else null)
-        }
     }
 
     // ---------- server-synced settings (Remote edits, tracker applies) ----------

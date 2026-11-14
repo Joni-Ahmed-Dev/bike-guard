@@ -173,14 +173,6 @@ data class DeviceSettingsDto(
 )
 
 @Serializable
-data class FamilyInviteDto(
-    val id: String? = null,
-    val code: String,
-    val role: String = "viewer",
-    @SerialName("used_by") val usedBy: String? = null,
-)
-
-@Serializable
 data class ParkingSpotDto(
     val id: String? = null,
     @SerialName("device_id") val deviceId: String,

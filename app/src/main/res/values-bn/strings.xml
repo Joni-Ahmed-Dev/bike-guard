@@ -157,7 +157,6 @@
     <string name="service_in">সার্ভিস %1$d কি.মি. পরে</string>
     <string name="service_overdue">সার্ভিস বাকি</string>
     <string name="close">বন্ধ করুন</string>
-    <string name="add">যোগ করুন</string>
     <string name="set_guard">চুরি-প্রতিরোধ</string>
     <string name="guard_parking">পার্কিং মোড</string>
     <string name="guard_parking_desc">পার্ক করা বাইক সরানো বা ছেঁড়াছেঁড়ি হলে সতর্ক করে। চালানোর আগে বন্ধ করুন।</string>
@@ -231,13 +230,6 @@
     <string name="export_gpx">GPX এক্সপোর্ট</string>
     <string name="ride_score">রাইড স্কোর %1$d/১০০</string>
     <string name="ride_score_hint">%1$d বার হঠাৎ ব্রেক, %2$d%% সময় ৮০ কি.মি/ঘণ্টার বেশি</string>
-    <string name="family_title">পরিবারের দেখার আমন্ত্রণ</string>
-    <string name="family_desc">পরিবার বাইক লাইভ দেখতে পারবে, কিন্তু কিছু বদলাতে পারবে না।</string>
-    <string name="family_generate">আমন্ত্রণ কোড তৈরি করুন</string>
-    <string name="family_code">আমন্ত্রণ কোড: %1$s</string>
-    <string name="family_use">আমন্ত্রণ কোড ব্যবহার করুন</string>
-    <string name="family_code_hint">মালিকের ফোনের কোডটি লিখুন</string>
-    <string name="family_saved">আমন্ত্রণ জমা হয়েছে — এই ফোন এখন শুধু দেখবে</string>
     <string name="schedule_title">গার্ডের সময়সূচি</string>
     <string name="schedule_desc">এই সময়ে গার্ড নিজে চালু হবে, সময় শেষে বন্ধ হবে।</string>
     <string name="schedule_start">শুরু (ঘণ্টা)</string>
@@ -256,9 +248,6 @@
     <string name="pin_label">PIN</string>
     <string name="continue_label">চালিয়ে যান</string>
     <string name="settings_target">বাইক: %1$s</string>
-    <string name="invite_mode">শুধু দেখা যাবে (পরিবারের আমন্ত্রণ)</string>
-
-    <string name="invite_clear">আমন্ত্রণ সরান</string>
 
     <string name="sync_last_try">শেষ চেষ্টা %1$s — %2$s</string>
     <string name="sync_err_no_internet">ইন্টারনেট নেই</string>

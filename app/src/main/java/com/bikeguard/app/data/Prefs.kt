@@ -200,10 +200,6 @@ class Prefs(private val context: Context) {
     var rolePin: String
         get() = sp.getString("role_pin", "") ?: ""
         set(v) = sp.edit { putString("role_pin", v) }
-    /** Family view-only invite code entered on this phone (read-only Viewer, no controls). */
-    var viewerInviteCode: String?
-        get() = sp.getString("invite_code", null)
-        set(v) = sp.edit { putString("invite_code", v) }
     /** The bike device the Remote phone controls (its device_settings row). Empty = this phone. */
     var remoteTargetDeviceId: String
         get() = sp.getString("remote_target", "") ?: ""
@@ -277,7 +273,6 @@ class Prefs(private val context: Context) {
 
     val isTracker: Boolean get() = appRole == ROLE_TRACKER
     val isRemote: Boolean get() = appRole == ROLE_REMOTE
-    val isInviteMode: Boolean get() = !viewerInviteCode.isNullOrBlank()
 
     val isLoggedIn: Boolean get() = !refreshToken.isNullOrEmpty()
     /** The Remote phone never tracks, even if an old install left tracking prefs behind. */
@@ -291,7 +286,7 @@ class Prefs(private val context: Context) {
         // Sign-out disarms the guard: the saved anchor must go too, or a
         // later re-arm at a new spot would measure against the old one.
         remove("guard_anchor_lat"); remove("guard_anchor_lng"); remove("guard_anchor_at_ms")
-        remove("invite_code")
+        remove("invite_code") // stale key from the removed family-invite feature (v1.2.5); nothing reads it anymore
         remove("remote_target") // a stale Remote target must not point at the old account's device
     }
 }

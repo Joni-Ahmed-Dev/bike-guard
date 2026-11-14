@@ -348,7 +348,7 @@ class SupabaseApi(private val prefs: Prefs) {
         }.ok
     }
 
-    // ---------- v1.1.0: server-synced settings, family invites, parking spots ----------
+    // ---------- v1.1.0: server-synced settings, parking spots ----------
 
     /** The Remote phone's edits for one tracker device, or null when no row exists yet. */
     suspend fun getDeviceSettings(deviceId: String): DeviceSettingsDto? {
@@ -396,14 +396,6 @@ class SupabaseApi(private val prefs: Prefs) {
         authed {
             builder("/rest/v1/device_settings?device_id=eq.$deviceId", it)
                 .header("Prefer", "return=minimal").patch(body.toRequestBody(jsonType)).build()
-        }.ok
-    } catch (e: IOException) { false }
-
-    suspend fun createFamilyInvite(code: String): Boolean = try {
-        val payload = json.encodeToString(FamilyInviteDto.serializer(), FamilyInviteDto(code = code))
-        authed {
-            builder("/rest/v1/family_invites", it).header("Prefer", "return=minimal")
-                .post(payload.toRequestBody(jsonType)).build()
         }.ok
     } catch (e: IOException) { false }
 

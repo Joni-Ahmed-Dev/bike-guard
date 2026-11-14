@@ -42,7 +42,7 @@ object Notifier {
     }
 
     /**
-     * Post a real system notification for one server event row (Remote / invite phone).
+     * Post a real system notification for one server event row (Remote phone).
      * Returns false when skipped: not logged in, the tracker phone (its own events are
      * not news for the person holding it), an event id already notified, an event the
      * user already saw in the Alerts tab, or notifications not granted.

@@ -84,9 +84,6 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     var dlResult by remember { mutableStateOf<Int?>(null) }
     var schedStart by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.guardScheduleStart?.toString() ?: prefs.guardScheduleStart.takeIf { it in 0..23 }?.toString() ?: "") }
     var schedEnd by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.guardScheduleEnd?.toString() ?: prefs.guardScheduleEnd.takeIf { it in 0..23 }?.toString() ?: "") }
-    var familyCode by remember { mutableStateOf<String?>(null) }
-    var inviteInput by remember { mutableStateOf(prefs.viewerInviteCode.orEmpty()) }
-    var inviteSaved by remember { mutableStateOf(false) }
     var showPinDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
     var pinWrong by remember { mutableStateOf(false) }
@@ -197,8 +194,8 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             }
         }
 
-        // ---- tracker role (and invite mode): settings are view-only ----
-        if (isTracker || vm.inviteCode != null) {
+        // ---- tracker role: settings are view-only ----
+        if (isTracker) {
             Panel(Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.tracker_view_only), color = Palette.Ember, style = MaterialTheme.typography.bodyMedium)
             }
@@ -260,8 +257,8 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             }
         }
 
-        // ---- editable settings: Remote only, and never while an invite code is set ----
-        if (isRemote && vm.inviteCode == null) {
+        // ---- editable settings: Remote only ----
+        if (isRemote) {
         // ---- tracking mode ----
         Panel(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.set_mode), style = MaterialTheme.typography.titleMedium)
@@ -454,49 +451,6 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         }
         } // end of editable settings (tracker role sees them read-only above)
 
-        // ---- family view-only invite: always shown while an invite code is set, even
-        // when no role is picked, so the code (and Remove invite) is never hidden ----
-        if (isRemote || vm.inviteCode != null) {
-            Panel(Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.family_title), style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(4.dp))
-                Text(stringResource(R.string.family_desc), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
-                if (isRemote) {
-                    Spacer(Modifier.height(12.dp))
-                    Button(onClick = { vm.createFamilyInvite { familyCode = it } }, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.family_generate))
-                    }
-                    familyCode?.let {
-                        Spacer(Modifier.height(8.dp))
-                        Text(stringResource(R.string.family_code, it), style = MaterialTheme.typography.titleMedium, color = Palette.Ember)
-                    }
-                }
-                if (vm.inviteCode == null) {
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = inviteInput, onValueChange = { inviteInput = it.trim(); inviteSaved = false }, singleLine = true,
-                        label = { Text(stringResource(R.string.family_use)) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(onClick = {
-                        vm.updateInviteCode(inviteInput); inviteSaved = inviteInput.isNotBlank()
-                    }) { Text(stringResource(R.string.add)) }
-                } else {
-                    Spacer(Modifier.height(12.dp))
-                    Text(stringResource(R.string.family_code, vm.inviteCode.orEmpty()), style = MaterialTheme.typography.titleMedium, color = Palette.Ember)
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(onClick = { vm.clearInviteCode(); inviteInput = ""; inviteSaved = false }) {
-                        Text(stringResource(R.string.invite_clear))
-                    }
-                }
-                if (inviteSaved) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(stringResource(R.string.family_saved), color = Palette.Signal, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
-
         // ---- battery ----
         Panel(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.battery_title), style = MaterialTheme.typography.titleMedium)
@@ -538,7 +492,6 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                     R.string.role_current,
                     stringResource(
                         if (isTracker) R.string.role_tracker
-                        else if (vm.role.isEmpty()) R.string.invite_mode
                         else R.string.role_remote
                     ),
                 ),

@@ -31,7 +31,6 @@ fun AuthScreen(vm: AppViewModel) {
     var signUp by rememberSaveable { mutableStateOf(false) }
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
-    var invite by rememberSaveable { mutableStateOf("") }
     var showPw by remember { mutableStateOf(false) }
     val canSubmit = email.contains("@") && password.length >= 6 && !vm.busy
 
@@ -79,14 +78,6 @@ fun AuthScreen(vm: AppViewModel) {
                 shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(),
             )
 
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = invite, onValueChange = { invite = it }, singleLine = true,
-                label = { Text(stringResource(R.string.family_use)) },
-                supportingText = { Text(stringResource(R.string.family_code_hint)) },
-                shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(),
-            )
-
             vm.error?.let { Spacer(Modifier.height(12.dp)); Text(it, color = Palette.Danger) }
             vm.info?.let { Spacer(Modifier.height(12.dp)); Text(it, color = Palette.Signal) }
             if (!vm.configured) {
@@ -97,7 +88,6 @@ fun AuthScreen(vm: AppViewModel) {
             Spacer(Modifier.height(24.dp))
             Button(
                 onClick = {
-                    if (invite.isNotBlank()) vm.updateInviteCode(invite)
                     vm.submit(email, password, signUp)
                 },
                 enabled = canSubmit,

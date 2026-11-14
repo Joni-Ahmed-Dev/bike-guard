@@ -63,7 +63,7 @@ private enum class Status(val label: Int, val color: Color) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(), readOnly: Boolean = false) {
+fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel()) {
     val ctx = LocalContext.current
     val owner = LocalLifecycleOwner.current
     LaunchedEffect(Unit) {
@@ -108,7 +108,7 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
             SheetContent(
                 ctx = ctx, now = now, latest = latest, status = status, deviceName = deviceName,
                 loading = !vm.loaded && vm.selectedId != null, noDevice = vm.devicesLoaded && vm.devices.isEmpty(),
-                vm = vm, readOnly = readOnly, expanded = sheetExpanded,
+                vm = vm, expanded = sheetExpanded,
                 onToggleSheet = {
                     // Read targetValue, not the settled currentValue: if the sheet is still
                     // animating toward Expanded, a second tap must collapse it instead of
@@ -195,7 +195,7 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
 @Composable
 private fun SheetContent(
     ctx: Context, now: Long, latest: LocationDto?, status: Status, deviceName: String, loading: Boolean, noDevice: Boolean,
-    vm: ViewerViewModel, readOnly: Boolean = false, expanded: Boolean = false, onToggleSheet: () -> Unit = {},
+    vm: ViewerViewModel, expanded: Boolean = false, onToggleSheet: () -> Unit = {},
 ) {
     // Issue #2: while the sheet is only peeking, its content must NOT be scrollable — a
     // scrollable sheet swallows the drag and the sheet gets stuck halfway. Scrolling turns
@@ -271,8 +271,7 @@ private fun SheetContent(
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                if (!readOnly) ViewerControls(vm)
-                else Text(stringResource(R.string.invite_mode), color = Palette.Muted, style = MaterialTheme.typography.labelMedium)
+                ViewerControls(vm)
             }
         }
     }

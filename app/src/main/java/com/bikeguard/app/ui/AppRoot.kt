@@ -52,7 +52,7 @@ import kotlinx.coroutines.delay
 fun AppRoot(vm: AppViewModel = viewModel()) {
     Crossfade(targetState = vm.loggedIn, label = "root") { loggedIn ->
         if (!loggedIn) AuthScreen(vm)
-        else if (vm.inviteCode == null && vm.role.isEmpty()) RolePickerScreen(vm)
+        else if (vm.role.isEmpty()) RolePickerScreen(vm)
         else HomeScreen(vm)
     }
 }
@@ -63,13 +63,8 @@ private data class TabItem(val id: String, val label: Int, val icon: ImageVector
 private fun HomeScreen(vm: AppViewModel, alerts: AlertsViewModel = viewModel()) {
     val ctx = LocalContext.current
     val owner = LocalLifecycleOwner.current
-    // Tabs by role: the tracker phone only tracks; the Remote phone controls everything;
-    // a family invite sees the Viewer read-only.
+    // Tabs by role: the tracker phone only tracks; the Remote phone controls everything.
     val tabs = when {
-        vm.inviteCode != null -> listOf(
-            TabItem("viewer", R.string.tab_viewer, Icons.Default.Map),
-            TabItem("settings", R.string.tab_settings, Icons.Default.Settings),
-        )
         vm.role == com.bikeguard.app.data.ROLE_TRACKER -> listOf(
             TabItem("tracker", R.string.tab_tracker, Icons.Default.GpsFixed),
             TabItem("settings", R.string.tab_settings, Icons.Default.Settings),
@@ -128,7 +123,7 @@ private fun HomeScreen(vm: AppViewModel, alerts: AlertsViewModel = viewModel()) 
         when (tabId) {
             "tracker" -> TrackerScreen(vm, m)
             "dashboard" -> DashboardScreen(m, alerts = alerts)
-            "viewer" -> ViewerScreen(m, readOnly = vm.inviteCode != null)
+            "viewer" -> ViewerScreen(m)
             "trips" -> TripsScreen(m)
             "alerts" -> AlertsScreen(m, alerts)
             "expenses" -> ExpensesScreen(m)
