@@ -243,6 +243,19 @@ class Prefs(private val context: Context) {
         get() = sp.getLong("disarm_at_ms", 0L)
         set(v) = sp.edit { putLong("disarm_at_ms", v) }
 
+    /** First-run setup wizard (v1.2.9): true once the user finished it with every
+     *  step done. Skipping leaves it false, so the wizard shows again on the next
+     *  launch while setup is still incomplete. Survives sign-out (the phone's
+     *  permissions survive too); the wizard stays reachable from Settings. */
+    var onboardingDone: Boolean
+        get() = sp.getBoolean("onboarding_done", false)
+        set(v) = sp.edit { putBoolean("onboarding_done", v) }
+    /** MIUI Autostart cannot be detected by any public API, so the wizard asks the
+     *  user to confirm it by hand after turning it on in the Security app. */
+    var autostartConfirmed: Boolean
+        get() = sp.getBoolean("autostart_confirmed", false)
+        set(v) = sp.edit { putBoolean("autostart_confirmed", v) }
+
     /** Guard anchor: the parked position `moved` alerts are measured against.
      *  Persisted (not just in-memory like Guard.anchor) so a service restart —
      *  Watchdog revival, reboot, force-stop — does not lose it: without this

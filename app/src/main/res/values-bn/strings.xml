@@ -63,6 +63,17 @@
     <string name="battery_body">ব্যাটারি অপটিমাইজেশন বন্ধ করুন। Xiaomi, Oppo, Vivo ও Samsung ফোনে Autostart বা Unrestricted battery-ও চালু করুন।</string>
     <string name="open_settings">সেটিংস খুলুন</string>
 
+    <string name="onb_title">এই ফোনটা সেট আপ করুন</string>
+    <string name="onb_subtitle">কয়েকটা ধাপ, যাতে স্ক্রিন বন্ধ থাকলেও বাইকে ট্র্যাকার চলতে থাকে।</string>
+    <string name="onb_progress">%1$d / %2$d হয়েছে</string>
+    <string name="onb_all_done">সব ঠিক আছে। ট্র্যাকার তৈরি।</string>
+    <string name="onb_open">সেটআপ চেকলিস্ট</string>
+    <string name="onb_autostart_title">Autostart চালু করুন</string>
+    <string name="onb_autostart_body">Xiaomi ফোনে Security অ্যাপে গিয়ে BikeGuard-এর Autostart চালু করুন, নাহলে Android ট্র্যাকার বন্ধ করে দিতে পারে। Autostart চালু আছে কি না অ্যাপ নিজে বুঝতে পারে না, তাই চালু করে এখানে নিশ্চিত করুন।</string>
+    <string name="onb_autostart_open">Autostart সেটিংস খুলুন</string>
+    <string name="onb_autostart_confirm">চালু করেছি</string>
+    <string name="onb_not_needed">দরকার নেই</string>
+
     <string name="viewer_no_device_title">এখনও কোনো ট্র্যাকার নেই</string>
     <string name="viewer_no_device_body">বাইকের ফোনে একই অ্যাকাউন্টে সাইন ইন করে সেখানে ট্র্যাকিং চালু করুন।</string>
     <string name="viewer_waiting">প্রথম লোকেশনের অপেক্ষায়…</string>

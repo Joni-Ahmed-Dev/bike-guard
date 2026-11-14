@@ -45,6 +45,7 @@ import com.bikeguard.app.ui.agoText
 import com.bikeguard.app.ui.openBatterySettings
 import com.bikeguard.app.ui.rememberNow
 import com.bikeguard.app.ui.diagnostics.DiagnosticsScreen
+import com.bikeguard.app.ui.onboarding.OnboardingScreen
 import com.bikeguard.app.ui.theme.Palette
 import com.bikeguard.app.ui.theme.Panel
 import kotlinx.coroutines.launch
@@ -91,6 +92,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     var testResult by remember { mutableStateOf<String?>(null) }
     var testOk by remember { mutableStateOf(false) }
     var showDiagnostics by remember { mutableStateOf(false) }
+    var showOnboarding by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { if (isRemote) vm.loadRemoteSettings() }
@@ -138,6 +140,11 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         DiagnosticsScreen(onBack = { showDiagnostics = false }, Modifier.fillMaxSize())
         return
     }
+    // Same full-screen rule for the setup checklist.
+    if (showOnboarding) {
+        OnboardingScreen(onFinish = { showOnboarding = false }, Modifier.fillMaxSize())
+        return
+    }
     Column(
         modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -150,6 +157,16 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 onClick = { showDiagnostics = true },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(stringResource(R.string.diag_title)) }
+        }
+
+        // ---- setup checklist: the first-run wizard, for this (bike) phone only ----
+        if (isTracker) {
+            Panel(Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = { showOnboarding = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.onb_open)) }
+            }
         }
 
         // ---- sync status (Remote only): did the bike phone apply the settings? ----

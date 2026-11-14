@@ -1,5 +1,6 @@
 package com.bikeguard.app.ui
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -37,6 +38,26 @@ fun openBatterySettings(ctx: Context) {
     val direct = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}"))
     try { ctx.startActivity(direct) } catch (e: Exception) {
         runCatching { ctx.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+    }
+}
+
+/** MIUI's Autostart screen has no public API: try the known Security Center
+ *  component, then fall back to this app's details page (where the user can
+ *  still reach Autostart on some MIUI versions). Returns silently when neither
+ *  screen exists, e.g. on non-MIUI phones. */
+fun openAutostartSettings(ctx: Context) {
+    val miui = Intent().setComponent(
+        ComponentName(
+            "com.miui.securitycenter",
+            "com.miui.permcenter.autostart.AutoStartManagementActivity",
+        )
+    )
+    runCatching { ctx.startActivity(miui) }.onFailure {
+        runCatching {
+            ctx.startActivity(
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}"))
+            )
+        }
     }
 }
 

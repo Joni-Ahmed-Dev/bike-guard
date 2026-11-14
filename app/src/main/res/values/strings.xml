@@ -63,6 +63,17 @@
     <string name="battery_body">Disable battery optimization. On Xiaomi, Oppo, Vivo and Samsung phones, also turn on Autostart or Unrestricted battery.</string>
     <string name="open_settings">Open settings</string>
 
+    <string name="onb_title">Set up this phone</string>
+    <string name="onb_subtitle">A few steps so the tracker keeps running on the bike, even with the screen off.</string>
+    <string name="onb_progress">%1$d of %2$d done</string>
+    <string name="onb_all_done">All set. The tracker is ready.</string>
+    <string name="onb_open">Setup checklist</string>
+    <string name="onb_autostart_title">Turn on Autostart</string>
+    <string name="onb_autostart_body">On Xiaomi phones, turn on Autostart for BikeGuard in the Security app, or Android may stop the tracker. The app cannot check Autostart itself, so confirm it here once you have turned it on.</string>
+    <string name="onb_autostart_open">Open autostart settings</string>
+    <string name="onb_autostart_confirm">I turned it on</string>
+    <string name="onb_not_needed">Not needed</string>
+
     <string name="viewer_no_device_title">No tracker yet</string>
     <string name="viewer_no_device_body">Sign in with the same account on your bike phone and start tracking there.</string>
     <string name="viewer_waiting">Waiting for the first location…</string>

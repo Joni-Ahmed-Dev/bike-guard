@@ -23,6 +23,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -34,12 +36,14 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bikeguard.app.R
 import com.bikeguard.app.bikeApp
+import com.bikeguard.app.data.ROLE_TRACKER
 import com.bikeguard.app.push.PushRegistrar
 import com.bikeguard.app.ui.alerts.AlertsScreen
 import com.bikeguard.app.ui.alerts.AlertsViewModel
 import com.bikeguard.app.ui.auth.AuthScreen
 import com.bikeguard.app.ui.dashboard.DashboardScreen
 import com.bikeguard.app.ui.expenses.ExpensesScreen
+import com.bikeguard.app.ui.onboarding.OnboardingScreen
 import com.bikeguard.app.ui.roles.RolePickerScreen
 import com.bikeguard.app.ui.settings.SettingsScreen
 import com.bikeguard.app.ui.theme.Palette
@@ -50,9 +54,23 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun AppRoot(vm: AppViewModel = viewModel()) {
+    val ctx = LocalContext.current
+    val prefs = ctx.bikeApp.prefs
+    var onboardingDone by remember { mutableStateOf(prefs.onboardingDone) }
+    // Session-only: skipping the wizard hides it until the next launch, when it
+    // shows again while setup is still incomplete. Finishing sets onboardingDone.
+    var wizardDismissed by remember { mutableStateOf(false) }
     Crossfade(targetState = vm.loggedIn, label = "root") { loggedIn ->
         if (!loggedIn) AuthScreen(vm)
         else if (vm.role.isEmpty()) RolePickerScreen(vm)
+        // The setup checklist is for the bike phone only: location all the time,
+        // battery and Autostart do not apply to the Remote phone.
+        else if (vm.role == ROLE_TRACKER && !onboardingDone && !wizardDismissed) {
+            OnboardingScreen(onFinish = { completed ->
+                if (completed) { prefs.onboardingDone = true; onboardingDone = true }
+                else wizardDismissed = true
+            })
+        }
         else HomeScreen(vm)
     }
 }
