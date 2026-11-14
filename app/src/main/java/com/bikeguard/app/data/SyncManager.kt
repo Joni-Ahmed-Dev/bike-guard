@@ -37,6 +37,36 @@ class SyncManager(
         outcome.ok
     }
 
+    /**
+     * Uploads one location batch. A 400/422 splits the batch in halves and retries,
+     * so one bad row cannot wipe the other 99 points: only rows the server rejects
+     * one by one are dropped. A transient failure (5xx / network / 409 re-register)
+     * stops the flush and leaves everything still queued for the next try.
+     * @return null when the whole batch is resolved, the retry reason otherwise.
+     */
+    private suspend fun uploadLocationsSplit(batch: List<PendingLocation>, ownerId: String?): String? {
+        val stack = ArrayDeque<List<PendingLocation>>()
+        stack.addLast(batch)
+        while (stack.isNotEmpty()) {
+            val chunk = stack.removeLast()
+            val up = api.upload(chunk.map { it.toDto(prefs.deviceId, ownerId) })
+            when (up.result) {
+                UploadResult.OK -> dao.delete(chunk.map { it.id })
+                UploadResult.REJECTED -> {
+                    if (chunk.size == 1) {
+                        dao.delete(chunk.map { it.id }) // this row alone is bad; drop only it
+                    } else {
+                        val mid = chunk.size / 2
+                        stack.addLast(chunk.subList(mid, chunk.size))
+                        stack.addLast(chunk.subList(0, mid))
+                    }
+                }
+                UploadResult.RETRY -> return up.error // transient: keep the rest queued
+            }
+        }
+        return null
+    }
+
     private suspend fun flushLocked(): FlushOutcome {
         if (!prefs.isLoggedIn) return FlushOutcome(false, "signed out")
         // The Remote phone never registers itself as a device and never uploads locations.
@@ -72,15 +102,13 @@ class SyncManager(
             var error: String? = null
             fun fail(e: String?) { ok = false; if (error == null) error = e }
 
-            // locations: one bad batch must not block the alerts behind it
+            // locations: one bad row must not wipe the whole batch — a 400/422
+            // splits the batch in halves until the bad row is isolated, so only
+            // rows the server rejects one by one are dropped
             while (true) {
                 val batch = dao.next(100)
                 if (batch.isEmpty()) break
-                val up = api.upload(batch.map { it.toDto(prefs.deviceId, ownerId) })
-                when (up.result) {
-                    UploadResult.OK, UploadResult.REJECTED -> dao.delete(batch.map { it.id })
-                    UploadResult.RETRY -> { fail("upload: ${up.error}"); break }
-                }
+                uploadLocationsSplit(batch, ownerId)?.let { fail("upload: $it"); break }
             }
             // alerts (tamper, theft, crash ...) upload even when the locations failed
             while (true) {
