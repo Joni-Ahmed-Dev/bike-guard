@@ -8,6 +8,11 @@ import kotlinx.serialization.json.JsonObject
 
 /** Entry points shared by the service, the UI, the widget and FCM handlers. */
 object GuardControl {
+    /** Alerts queue cap (v1.2.13): the locations queue already trims to 50,000,
+     *  but the alerts queue had no cap at all — a flapping guard could grow it
+     *  without bound while offline. 500 is far more than a day of alerts. */
+    private const val MAX_EVENTS = 500
+
     /**
      * [latch] records a manual disarm, so auto re-arm waits 10 minutes. The guard schedule's
      * own window-end disarm passes latch = false, so it never blocks the next window.
@@ -41,6 +46,7 @@ object GuardControl {
                     data = data?.toString(), createdAt = System.currentTimeMillis()
                 )
             )
+            app.db.events().trim(MAX_EVENTS)
             app.sync.flush()
         }
     }

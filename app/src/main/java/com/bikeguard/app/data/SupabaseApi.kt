@@ -110,6 +110,9 @@ class SupabaseApi(private val prefs: Prefs) {
         prefs.refreshToken = a.refreshToken
         // A fresh token means the session is alive again: any earlier expiry warning is stale.
         prefs.sessionExpiredPending = false
+        // New credentials, fresh start: a 403 from the old account must not keep
+        // the sync backed off after a re-sign-in.
+        prefs.serverRejectCount = 0; prefs.syncBackoffUntilMs = 0L; prefs.syncBlockedReason = ""
         a.user?.let { prefs.userId = it.id; prefs.email = it.email }
     }
 
@@ -193,7 +196,13 @@ class SupabaseApi(private val prefs: Prefs) {
         }
         when {
             r.ok -> UploadOutcome(UploadResult.OK)
-            r.code == 409 || r.code == 403 -> { prefs.deviceRegistered = false; UploadOutcome(UploadResult.RETRY, r.error) } // device row missing or forbidden: re-register
+            // 409 = the device row is genuinely gone (FK): re-register once.
+            // 403 = the policy refuses this account/row: re-registering the same
+            // id cannot fix it, so do NOT clear deviceRegistered — clearing it
+            // made every flush re-register, upload, 403 again, forever. The
+            // flush backoff in SyncManager bounds the retries instead.
+            r.code == 409 -> { prefs.deviceRegistered = false; UploadOutcome(UploadResult.RETRY, r.error) }
+            r.code == 403 -> UploadOutcome(UploadResult.RETRY, r.error)
             r.code == 400 || r.code == 422 -> UploadOutcome(UploadResult.REJECTED, r.error) // malformed: never succeeds, drop it
             else -> UploadOutcome(UploadResult.RETRY, r.error)
         }
@@ -256,7 +265,10 @@ class SupabaseApi(private val prefs: Prefs) {
         }
         when {
             r.ok -> UploadOutcome(UploadResult.OK)
-            r.code == 409 || r.code == 403 -> { prefs.deviceRegistered = false; UploadOutcome(UploadResult.RETRY, r.error) }
+            // Same split as upload(): only a 409 (missing device row) justifies
+            // re-registering; a 403 is a policy refusal the same id cannot fix.
+            r.code == 409 -> { prefs.deviceRegistered = false; UploadOutcome(UploadResult.RETRY, r.error) }
+            r.code == 403 -> UploadOutcome(UploadResult.RETRY, r.error)
             r.code == 400 || r.code == 422 -> UploadOutcome(UploadResult.REJECTED, r.error)
             else -> UploadOutcome(UploadResult.RETRY, r.error)
         }

@@ -194,6 +194,25 @@ class Prefs(private val context: Context) {
         get() = sp.getLong("last_sync_attempt", 0L)
         set(v) = sp.edit { putLong("last_sync_attempt", v) }
 
+    /** Consecutive flushes the server rejected with 403/409 (v1.2.13). Reset on any
+     *  successful flush. After 3 in a row the sync backs off instead of hammering
+     *  the server with a register + upload round-trip on every location fix. */
+    var serverRejectCount: Int
+        get() = sp.getInt("server_reject_count", 0)
+        set(v) = sp.edit { putInt("server_reject_count", v) }
+    /** Do not attempt any server upload before this time (millis); 0 = no backoff.
+     *  Set when the server keeps rejecting us; cleared on a successful flush or a
+     *  fresh sign-in. While it is in the future, flush() returns the stored reason
+     *  without touching the network. */
+    var syncBackoffUntilMs: Long
+        get() = sp.getLong("sync_backoff_until_ms", 0L)
+        set(v) = sp.edit { putLong("sync_backoff_until_ms", v) }
+    /** The server's own rejection message while backed off ("" = not blocked).
+     *  Shown on the Tracker screen through lastSyncError. */
+    var syncBlockedReason: String
+        get() = sp.getString("sync_blocked_reason", "") ?: ""
+        set(v) = sp.edit { putString("sync_blocked_reason", v) }
+
     /** Last diagnostics report sent to the bikeguard-diag Worker, in millis since epoch; 0 = never sent. */
     var lastDiagReportAtMs: Long
         get() = sp.getLong("last_diag_report", 0L)

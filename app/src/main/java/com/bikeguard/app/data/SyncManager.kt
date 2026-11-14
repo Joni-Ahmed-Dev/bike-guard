@@ -23,10 +23,45 @@ class SyncManager(
 
     /** @return true when everything uploaded, false when something must be retried. */
     suspend fun flush(): Boolean = mutex.withLock {
+        val now = System.currentTimeMillis()
+        // Backed off after repeated server rejections (v1.2.13): report the stored
+        // reason without touching the network, and do NOT count this as another
+        // rejection — or the backoff would re-arm itself forever.
+        if (now < prefs.syncBackoffUntilMs) {
+            prefs.lastSyncAttemptMs = now
+            prefs.lastSyncError = prefs.syncBlockedReason
+            return false
+        }
         val prevError = prefs.lastSyncError
         val outcome = flushLocked()
-        prefs.lastSyncAttemptMs = System.currentTimeMillis()
+        prefs.lastSyncAttemptMs = now
         prefs.lastSyncError = if (outcome.ok) "" else (outcome.error ?: "no internet")
+        if (outcome.ok) {
+            // A working flush clears any earlier rejection streak and backoff.
+            if (prefs.serverRejectCount != 0 || prefs.syncBackoffUntilMs != 0L) {
+                prefs.serverRejectCount = 0; prefs.syncBackoffUntilMs = 0L; prefs.syncBlockedReason = ""
+            }
+        } else {
+            // A 403/409 is a server decision, not a blip: after 3 consecutive
+            // rejections stop hammering the server and back off (15 min, then
+            // 30, then 1 h). The queue stays put; nothing is dropped. Transient
+            // failures (no internet / 5xx) never count here and keep retrying.
+            val err = outcome.error.orEmpty()
+            if (err.contains("server 403") || err.contains("server 409")) {
+                val count = prefs.serverRejectCount + 1
+                prefs.serverRejectCount = count
+                if (count >= 3) {
+                    val backoffMs = when (count) {
+                        3 -> 15 * 60_000L
+                        4 -> 30 * 60_000L
+                        else -> 60 * 60_000L
+                    }
+                    prefs.syncBackoffUntilMs = now + backoffMs
+                    prefs.syncBlockedReason = err
+                    scope?.launch { diag?.report("sync blocked: $err, backing off ${backoffMs / 60_000} min") }
+                }
+            }
+        }
         // Report state changes to the diagnostics Worker (only when the
         // failure reason changes, so a stuck offline phone does not spam it).
         if (!outcome.ok && outcome.error != prevError) {
@@ -40,8 +75,9 @@ class SyncManager(
     /**
      * Uploads one queue batch (locations or alerts). A 400/422 splits the batch in halves
      * and retries, so one bad row cannot wipe the other rows: only rows the server
-     * rejects one by one are dropped. A transient failure (5xx / network / 409
-     * re-register) stops the flush and leaves everything still queued for the next try.
+     * rejects one by one are dropped. A transient failure (5xx / network / 403 / 409)
+     * stops the flush and leaves everything still queued for the next try; repeated
+     * 403/409 rejections back off in flush() instead of looping forever.
      * @return null when the whole batch is resolved, the retry reason otherwise.
      */
     private suspend fun <T> uploadSplit(

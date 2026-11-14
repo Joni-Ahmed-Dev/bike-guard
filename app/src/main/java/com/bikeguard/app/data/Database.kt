@@ -85,6 +85,11 @@ interface EventDao {
     @Query("DELETE FROM pending_events WHERE id IN (:ids)")
     suspend fun delete(ids: List<Long>)
 
+    /** Safety cap, mirroring the locations queue: a flapping guard must not grow
+     *  the alerts queue without bound while offline. Keeps the newest rows. */
+    @Query("DELETE FROM pending_events WHERE id NOT IN (SELECT id FROM pending_events ORDER BY createdAt DESC LIMIT :keep)")
+    suspend fun trim(keep: Int)
+
     @Query("DELETE FROM pending_events")
     suspend fun clear()
 }
