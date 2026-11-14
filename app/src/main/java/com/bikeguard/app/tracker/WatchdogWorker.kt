@@ -12,7 +12,6 @@ import com.bikeguard.app.MainActivity
 import com.bikeguard.app.R
 import com.bikeguard.app.bikeApp
 import com.bikeguard.app.data.Perms
-import com.bikeguard.app.data.isoToMs
 
 /** Runs about every 15 minutes: uploads the queue and revives tracking if Android killed it. */
 class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
@@ -35,7 +34,8 @@ class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 val cmds = app.api.pendingCommands(app.prefs.deviceId).orEmpty()
                 val freshStart = cmds.any { c ->
                     (c.type == "tracking_start" || c.type == "arm") &&
-                        System.currentTimeMillis() - isoToMs(c.createdAt.orEmpty()) < TrackingService.freshWindowMs(c.type)
+                        // Server-computed age (v1.2.8): a wrong phone clock cannot expire it.
+                        c.ageMs < TrackingService.freshWindowMs(c.type)
                 }
                 val guardArmed = runCatching { app.api.getDeviceSettings(app.prefs.deviceId)?.guardArmed }.getOrNull() == true
                 freshStart || guardArmed

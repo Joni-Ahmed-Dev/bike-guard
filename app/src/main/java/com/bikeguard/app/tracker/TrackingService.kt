@@ -417,7 +417,9 @@ class TrackingService : Service() {
         val cmds = try { app.api.pendingCommands(app.prefs.deviceId) } catch (e: IOException) { null } ?: return
         for (c in cmds) {
             val id = c.id ?: continue
-            val fresh = System.currentTimeMillis() - isoToMs(c.createdAt.orEmpty()) < freshWindowMs(c.type)
+            // Freshness is measured against the server-computed age (v1.2.8),
+            // so a phone clock minutes wrong cannot expire a live command.
+            val fresh = c.ageMs < freshWindowMs(c.type)
             if (fresh) execute(c)
             try { app.api.ackCommand(id, if (fresh) "done" else "expired") } catch (e: IOException) { /* retried next poll */ }
         }

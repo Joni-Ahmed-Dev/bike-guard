@@ -289,9 +289,10 @@ class SupabaseApi(private val prefs: Prefs) {
         }.getOrNull()
     }
 
+    /** Pending commands with their age computed by the database clock (v1.2.8), so a wrong phone clock cannot expire them. */
     suspend fun pendingCommands(deviceId: String): List<CommandDto>? {
-        val q = "/rest/v1/commands?device_id=eq.$deviceId&status=eq.pending&order=id.asc&select=id,type,arg,created_at"
-        val r = authed { builder(q, it).get().build() }
+        val body = buildJsonObject { put("p_device", deviceId) }.toString()
+        val r = authed { builder("/rest/v1/rpc/pending_commands", it).post(body.toRequestBody(jsonType)).build() }
         return if (r.ok) runCatching { json.decodeFromString(ListSerializer(CommandDto.serializer()), r.body) }.getOrNull() else null
     }
 

@@ -129,7 +129,19 @@ data class CommandDto(
     val arg: String? = null,
     val status: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
-)
+    // Age in seconds, computed by the database clock in pending_commands()
+    // (v1.2.8). A wrong phone clock can no longer expire commands.
+    @SerialName("age_seconds") val ageSeconds: Double? = null,
+) {
+    /**
+     * Age of this command in ms, from the server-computed age when present.
+     * Falls back to the phone clock only when the server did not supply an age
+     * (e.g. an old server without the pending_commands RPC).
+     */
+    val ageMs: Long get() =
+        ageSeconds?.let { (it * 1000).toLong() }
+            ?: (System.currentTimeMillis() - isoToMs(createdAt.orEmpty()))
+}
 
 @Serializable
 data class GeofenceDto(
