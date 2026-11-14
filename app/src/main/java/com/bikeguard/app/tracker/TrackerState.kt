@@ -26,14 +26,14 @@ object TrackerState {
      */
     val fixStatus = MutableStateFlow(FIX_NO_FIX)
 
-    companion object {
-        /** A fresh real fix is shown. */
-        const val FIX_LIVE = "live"
-        /** Only a stale / last-known fix is shown; it is not a live fix. */
-        const val FIX_LAST_KNOWN = "last_known"
-        /** No fix at all yet, and the provider is on. */
-        const val FIX_NO_FIX = "no_fix"
-        /** The location provider (GPS) is off, so no fix can arrive. */
-        const val FIX_GPS_OFF = "gps_off"
-    }
+    // Fix-status constants. These live directly on the object (a companion
+    // object is not allowed inside a standalone object declaration).
+    /** A fresh real fix is shown. */
+    const val FIX_LIVE = "live"
+    /** Only a stale / last-known fix is shown; it is not a live fix. */
+    const val FIX_LAST_KNOWN = "last_known"
+    /** No fix at all yet, and the provider is on. */
+    const val FIX_NO_FIX = "no_fix"
+    /** The location provider (GPS) is off, so no fix can arrive. */
+    const val FIX_GPS_OFF = "gps_off"
 }
