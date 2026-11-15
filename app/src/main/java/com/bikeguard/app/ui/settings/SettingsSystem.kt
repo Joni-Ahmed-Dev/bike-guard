@@ -407,6 +407,9 @@ fun UpdatePanel(vm: AppViewModel) {
     val ctx = LocalContext.current
     var checking by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<Int?>(null) }
+    // v1.2.32: when an update is already known (startup check or an
+    // earlier tap), the button says so and tapping it downloads.
+    val available = vm.updateAvailable
     Panel(Modifier.fillMaxWidth()) {
         PanelHeader(Icons.Default.Update, stringResource(R.string.update_title))
         Spacer(Modifier.height(4.dp))
@@ -417,21 +420,29 @@ fun UpdatePanel(vm: AppViewModel) {
         Spacer(Modifier.height(12.dp))
         LeafOutlinedButton(
             onClick = {
-                checking = true; result = null
-                vm.checkForUpdate { r ->
-                    checking = false
-                    // An available update shows the AppRoot dialog; here we
-                    // only report the other two outcomes.
-                    result = when (r) {
-                        is com.bikeguard.app.data.UpdateCheckResult.Available -> null
-                        com.bikeguard.app.data.UpdateCheckResult.UpToDate -> R.string.update_latest
-                        com.bikeguard.app.data.UpdateCheckResult.Failed -> R.string.update_failed
+                if (available != null) {
+                    vm.startUpdateDownload(ctx)
+                } else {
+                    checking = true; result = null
+                    vm.checkForUpdate { r ->
+                        checking = false
+                        // An available update shows the AppRoot dialog; here we
+                        // only report the other two outcomes.
+                        result = when (r) {
+                            is com.bikeguard.app.data.UpdateCheckResult.Available -> null
+                            com.bikeguard.app.data.UpdateCheckResult.UpToDate -> R.string.update_latest
+                            com.bikeguard.app.data.UpdateCheckResult.Failed -> R.string.update_failed
+                        }
                     }
                 }
             },
             enabled = !checking,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text(stringResource(if (checking) R.string.update_checking else R.string.update_check)) }
+        ) { Text(stringResource(when {
+            checking -> R.string.update_checking
+            available != null -> R.string.update_available_button
+            else -> R.string.update_check
+        })) }
         result?.let {
             Spacer(Modifier.height(8.dp))
             Text(stringResource(it), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)

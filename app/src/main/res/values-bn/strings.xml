@@ -377,5 +377,6 @@
     <string name="update_available_body">BikeGuard এর নতুন সংস্করণ এসেছে। এটি অ্যাপের ভেতরেই ডাউনলোড হবে, তারপর এই সংস্করণের উপর ইনস্টল করতে চাইবে।</string>
     <string name="update_download">ডাউনলোড</string>
     <string name="update_downloading">আপডেট ডাউনলোড হচ্ছে…</string>
+    <string name="update_available_button">আপডেট এসেছে</string>
     <string name="update_later">পরে</string>
 </resources>
