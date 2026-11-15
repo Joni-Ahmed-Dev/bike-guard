@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,6 +41,7 @@ fun ViewerControls(vm: ViewerViewModel) {
     var showShare by remember { mutableStateOf(false) }
     var showGeo by remember { mutableStateOf(false) }
     var showLimit by remember { mutableStateOf(false) }
+    var showSos by remember { mutableStateOf(false) }
     val armed = vm.selectedDevice?.armed == true
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -61,8 +63,28 @@ fun ViewerControls(vm: ViewerViewModel) {
             ControlButton(Icons.Default.Speed, R.string.ctl_limit, Modifier.weight(1f)) { showLimit = true }
             ControlButton(Icons.Default.Build, R.string.ctl_service, Modifier.weight(1f)) { vm.send("mark_serviced") }
         }
+        // Remote SOS (v1.2.19): the hold button used to exist only on the
+        // Tracker tab. This sends an "sos" command the bike executes at once
+        // (same immediate SOS as the hold). A confirm dialog, not a bare tap:
+        // a stray tap must never text the emergency contact.
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ControlButton(Icons.Default.Warning, R.string.ctl_sos, Modifier.weight(1f), tint = Palette.Danger) { showSos = true }
+        }
         vm.commandNote?.let { Text(stringResource(it), color = Palette.Muted, style = MaterialTheme.typography.labelMedium) }
     }
+
+    if (showSos) AlertDialog(
+        onDismissRequest = { showSos = false },
+        containerColor = Palette.Surface,
+        title = { Text(stringResource(R.string.sos_remote_title)) },
+        text = { Text(stringResource(R.string.sos_remote_text), color = Palette.Muted) },
+        confirmButton = {
+            Button(onClick = { showSos = false; vm.send("sos") }) { Text(stringResource(R.string.sos_remote_send)) }
+        },
+        dismissButton = {
+            TextButton(onClick = { showSos = false }) { Text(stringResource(R.string.cancel)) }
+        },
+    )
 
     if (showShare) ShareDialog(vm) { showShare = false }
     if (showGeo) GeofenceDialog(vm) { showGeo = false }

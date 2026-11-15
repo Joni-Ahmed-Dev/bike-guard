@@ -75,7 +75,11 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     var next by remember { mutableIntStateOf(prefs.nextServiceKm.toInt()) }
     var lock by remember { mutableStateOf(prefs.appLock) }
     var autoDenied by remember { mutableStateOf(false) }
-    var smsDenied by remember { mutableStateOf(false) }
+    // Live SEND_SMS state (v1.2.19): the toggle used to check the permission
+    // only at send time, so a revoked permission was discovered in an
+    // emergency. Checked on entry and after every permission result, so the
+    // panel below can warn before one.
+    var smsPermOk by remember { mutableStateOf(Perms.hasSms(ctx)) }
     var lockMsg by remember { mutableStateOf(false) }
 
     val isTracker = prefs.isTracker
@@ -102,7 +106,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         if (ok) vm.updateMode(MODE_AUTO)
     }
     val smsPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        smsDenied = !ok
+        smsPermOk = ok
         if (ok) { sms = true; prefs.sosSms = true; vm.pushSettingsPatch(sosSms = true) }
     }
     // ---- notification sounds (issue #8): one ringtone per channel ----
@@ -334,7 +338,21 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 if (!on) { sms = false; prefs.sosSms = false; vm.pushSettingsPatch(sosSms = false) }
                 else smsPerm.launch(Manifest.permission.SEND_SMS)
             }
-            if (smsDenied) Text(stringResource(R.string.sms_perm_needed), color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
+            // What actually happens (v1.2.19): sosSms defaults to false, so
+            // crash detection alone used to look like it sends an SMS when it
+            // does not. Say it plainly for every state, and offer the
+            // permission grant right here when it is the missing piece.
+            Spacer(Modifier.height(6.dp))
+            when {
+                !sms -> Text(stringResource(R.string.safety_sms_off), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+                number.isBlank() -> Text(stringResource(R.string.safety_sms_no_number), color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
+                !smsPermOk -> {
+                    Text(stringResource(R.string.sms_perm_needed), color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedButton(onClick = { smsPerm.launch(Manifest.permission.SEND_SMS) }) { Text(stringResource(R.string.grant)) }
+                }
+                else -> Text(stringResource(R.string.safety_sms_on, number.trim()), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+            }
             OutlinedTextField(
                 value = number, onValueChange = { number = it; prefs.emergencyNumber = it.trim() }, singleLine = true,
                 label = { Text(stringResource(R.string.safety_number)) },

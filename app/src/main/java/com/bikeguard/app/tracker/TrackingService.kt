@@ -92,6 +92,9 @@ class TrackingService : Service() {
         super.onCreate()
         guard = Guard(this, app)
         guard.start()
+        // A 60 s SOS countdown that outlived the process (v1.2.19): re-arm it
+        // here, or send at once when its deadline already passed.
+        SosController.resumePending(app)
         scope.launch {
             for (signal in flushSignal) {
                 try {
@@ -435,6 +438,7 @@ class TrackingService : Service() {
             "disarm" -> { GuardControl.setArmed(this, false); SirenPlayer.stop(this); pushSettingsToServer(guardArmed = false) }
             "set_speed_limit" -> { app.prefs.speedLimitKmh = c.arg?.toIntOrNull() ?: 0; app.prefs.stateDirty = true; pushSettingsToServer(speedLimitKmh = app.prefs.speedLimitKmh) }
             "cancel_sos" -> SosController.cancel(this)
+            "sos" -> GuardControl.sos(this) // Remote trigger (v1.2.19): same immediate SOS as the Tracker's hold button
             "mark_serviced" -> app.prefs.markServiced()
             "tracking_start" -> {
                 app.prefs.trackingActive = true

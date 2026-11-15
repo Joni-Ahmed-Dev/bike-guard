@@ -17,6 +17,10 @@ import com.bikeguard.app.data.Perms
 class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
         val app = applicationContext.bikeApp
+        // A 60 s SOS countdown that outlived the process (v1.2.19): the
+        // Watchdog runs even when the service itself is down, so this is the
+        // backstop that finishes a pending SOS.
+        SosController.resumePending(app)
         app.sync.flush()
         // Heartbeat to the diagnostics Worker, so the owner can see the tracker
         // is alive even when Supabase sync is failing.

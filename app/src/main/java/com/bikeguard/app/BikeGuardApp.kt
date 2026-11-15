@@ -12,6 +12,7 @@ import com.bikeguard.app.data.RealtimeClient
 import com.bikeguard.app.data.DiagReporter
 import com.bikeguard.app.data.SyncManager
 import com.bikeguard.app.tracker.Notifier
+import com.bikeguard.app.tracker.SosController
 import com.bikeguard.app.tracker.TrackerState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,6 +71,9 @@ class BikeGuardApp : Application() {
         // on the next start, so it is not lost with the dead process. Same id, so a
         // re-post just updates the notification already showing.
         if (prefs.sessionExpiredPending && prefs.isTracker) Notifier.sessionExpired(this)
+        // A 60 s SOS countdown that outlived the process (v1.2.19): re-arm it
+        // here, or send at once when its deadline already passed.
+        SosController.resumePending(this)
         // Report the app's state to the diagnostics Worker on every start,
         // so the owner can see the tracker even when Supabase sync is failing.
         appScope.launch { diag.report("app start") }

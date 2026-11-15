@@ -123,6 +123,22 @@ class Prefs(private val context: Context) {
     var emergencyNumber: String
         get() = sp.getString("sos_number", "") ?: ""
         set(v) = sp.edit { putString("sos_number", v) }
+
+    /** Pending SOS countdown (v1.2.19): the 60 s countdown used to live only
+     *  in an appScope coroutine, so a dead process lost the SMS. The deadline
+     *  and location are persisted here when the countdown starts and cleared
+     *  when the SMS is sent (or cancelled); SosController.resumePending
+     *  re-arms the countdown or sends at once on the next start. 0 / "" =
+     *  no SOS pending. */
+    var sosPendingUntilMs: Long
+        get() = sp.getLong("sos_pending_until", 0L)
+        set(v) = sp.edit { putLong("sos_pending_until", v) }
+    var sosPendingLat: String
+        get() = sp.getString("sos_pending_lat", "") ?: ""
+        set(v) = sp.edit { putString("sos_pending_lat", v) }
+    var sosPendingLng: String
+        get() = sp.getString("sos_pending_lng", "") ?: ""
+        set(v) = sp.edit { putString("sos_pending_lng", v) }
     var speedLimitKmh: Int
         get() = sp.getInt("speed_limit", 0)
         set(v) = sp.edit { putInt("speed_limit", v) }
@@ -378,5 +394,8 @@ class Prefs(private val context: Context) {
         remove("guard_anchor_lat"); remove("guard_anchor_lng"); remove("guard_anchor_at_ms")
         remove("invite_code") // stale key from the removed family-invite feature (v1.2.5); nothing reads it anymore
         remove("remote_target") // a stale Remote target must not point at the old account's device
+        // A pending SOS belongs to the old session: a signed-out phone must
+        // never text the old emergency contact after the countdown outlives it.
+        remove("sos_pending_until"); remove("sos_pending_lat"); remove("sos_pending_lng")
     }
 }

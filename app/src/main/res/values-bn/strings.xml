@@ -197,6 +197,17 @@
     <string name="sos_notif_title">দুর্ঘটনার সম্ভাবনা — ৬০ সেকেন্ডে জরুরি নম্বরে জানানো হবে</string>
     <string name="sos_cancel">আমি ঠিক আছি</string>
     <string name="sos_sms_text">BikeGuard SOS: দুর্ঘটনার সম্ভাবনা। শেষ লোকেশন: %1$s</string>
+    <string name="safety_sms_off">দুর্ঘটনা শনাক্ত হলে শুধু অ্যাপে সতর্কবার্তা আসবে। কোনো SMS পাঠানো হবে না।</string>
+    <string name="safety_sms_no_number">জরুরি নম্বর দেওয়া হয়নি, তাই SMS পাঠানো যাবে না।</string>
+    <string name="safety_sms_on">দুর্ঘটনা হলে %1$s নম্বরে SMS পাঠানো হবে।</string>
+    <string name="perm_sms_title">SMS অনুমতি</string>
+    <string name="perm_sms_body">দুর্ঘটনা বা SOS-এর পর জরুরি যোগাযোগকে SMS পাঠাতে এটি দরকার। না থাকলে শুধু অ্যাপে সতর্কবার্তা আসবে।</string>
+    <string name="ctl_sos">SOS</string>
+    <string name="sos_remote_title">এখনই SOS পাঠাবেন?</string>
+    <string name="sos_remote_text">এতে বাইকের ফোন থেকে এখনই জরুরি যোগাযোগকে SMS যাবে, শেষ লোকেশনসহ।</string>
+    <string name="sos_remote_send">SOS পাঠান</string>
+    <string name="ev_sos_failed">SOS SMS পাঠানো যায়নি</string>
+    <string name="cancel">বাতিল</string>
     <string name="widget_tap_hint">ট্র্যাকিং শুরু করতে ট্যাপ করুন</string>
 
     <string name="tab_dashboard">ড্যাশবোর্ড</string>

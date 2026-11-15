@@ -177,6 +177,38 @@ fun OnboardingScreen(onFinish: (completed: Boolean) -> Unit, modifier: Modifier 
         }
 
         Spacer(Modifier.height(8.dp))
+        // SOS texts need SEND_SMS, but only when the owner wants them (sosSms
+        // defaults off), so this is information, not a gating step: Continue
+        // must never force an SMS permission on someone who never wants SOS
+        // texts. The Settings safety panel is the other place the gap is
+        // warned about (v1.2.19).
+        val smsOk = remember(tick) { Perms.hasSms(ctx) }
+        val smsPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { tick++ }
+        Panel(Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    if (smsOk) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                    null,
+                    tint = if (smsOk) Palette.Signal else Palette.Muted,
+                    modifier = Modifier.size(28.dp),
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.perm_sms_title), style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(2.dp))
+                    Text(stringResource(R.string.perm_sms_body), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            if (!smsOk) {
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = { smsPerm.launch(Manifest.permission.SEND_SMS) },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                ) { Text(stringResource(R.string.grant)) }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
         Button(
             onClick = { onFinish(true) },
             enabled = allDone,

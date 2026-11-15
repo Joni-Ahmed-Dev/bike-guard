@@ -198,6 +198,17 @@
     <string name="sos_notif_title">Possible crash — contacting your emergency number in 60 s</string>
     <string name="sos_cancel">I’m OK</string>
     <string name="sos_sms_text">BikeGuard SOS: possible crash. Last location: %1$s</string>
+    <string name="safety_sms_off">Crash detection only raises an in-app alert. No SMS will be sent.</string>
+    <string name="safety_sms_no_number">No emergency number set, so no SMS can be sent.</string>
+    <string name="safety_sms_on">On a crash, an SMS will be sent to %1$s.</string>
+    <string name="perm_sms_title">SMS permission</string>
+    <string name="perm_sms_body">Needed to text your emergency contact after a crash or SOS. Without it, only in-app alerts are raised.</string>
+    <string name="ctl_sos">SOS</string>
+    <string name="sos_remote_title">Send SOS now?</string>
+    <string name="sos_remote_text">This texts your emergency contact from the bike phone at once, with its last location.</string>
+    <string name="sos_remote_send">Send SOS</string>
+    <string name="ev_sos_failed">SOS text failed to send</string>
+    <string name="cancel">Cancel</string>
     <string name="widget_tap_hint">Tap to start tracking</string>
 
     <string name="tab_dashboard">Dashboard</string>

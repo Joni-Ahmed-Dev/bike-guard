@@ -21,6 +21,7 @@ fun eventTitle(ctx: Context, type: String, dataJson: String?): String {
         "speed_limit" -> ctx.getString(R.string.ev_speed_limit, d.optInt("kmh"))
         "crash" -> ctx.getString(R.string.ev_crash)
         "sos" -> ctx.getString(R.string.ev_sos)
+        "sos_failed" -> ctx.getString(R.string.ev_sos_failed)
         "service_due" -> ctx.getString(R.string.ev_service_due)
         "device_stale" -> ctx.getString(R.string.ev_device_stale)
         "health_warning" -> ctx.getString(R.string.ev_health_warning)
