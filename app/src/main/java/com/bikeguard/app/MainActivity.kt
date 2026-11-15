@@ -43,7 +43,7 @@ class MainActivity : FragmentActivity() {
         val light = isLightMode(this)
         Palette.isLight = light
         val barStyle = if (light) SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
-        else SystemBarStyle.dark(Color.TRANSPARENT, Color.TRANSPARENT)
+        else SystemBarStyle.dark(Color.TRANSPARENT)
         enableEdgeToEdge(statusBarStyle = barStyle, navigationBarStyle = barStyle)
         // The theme's window background is the dark ink; on light theme the cold
         // start would flash dark behind the first frame without this.
