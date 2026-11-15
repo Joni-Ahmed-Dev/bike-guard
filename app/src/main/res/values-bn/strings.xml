@@ -272,6 +272,7 @@
     <string name="pin_label">PIN</string>
     <string name="continue_label">চালিয়ে যান</string>
     <string name="settings_target">বাইক: %1$s</string>
+    <string name="current_settings">বর্তমান সেটিংস</string>
 
     <string name="sync_last_try">শেষ চেষ্টা %1$s — %2$s</string>
     <string name="sync_err_no_internet">ইন্টারনেট নেই</string>

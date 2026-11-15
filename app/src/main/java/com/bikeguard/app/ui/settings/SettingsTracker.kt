@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.LocalParking
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
@@ -66,7 +67,7 @@ fun TrackerReadOnlyPanel(vm: AppViewModel) {
     val number = remember(vm.remoteSettings) { vm.remoteSettings?.sosNumber ?: prefs.emergencyNumber }
     val limit = remember(vm.remoteSettings) { vm.remoteSettings?.speedLimitKmh ?: prefs.speedLimitKmh }
     val serviceEvery = remember(vm.remoteSettings) { vm.remoteSettings?.serviceKm ?: prefs.serviceIntervalKm }
-    Panel(Modifier.fillMaxWidth()) {
+    ExpandablePanel(Icons.Default.Tune, stringResource(R.string.current_settings)) {
         ReadOnlyRow(stringResource(R.string.set_mode), stringResource(when (vm.mode) {
             MODE_MANUAL -> R.string.mode_manual
             MODE_AUTO -> R.string.mode_auto
@@ -98,7 +99,7 @@ fun TrackerSyncTestPanel() {
     var testResult by remember { mutableStateOf<String?>(null) }
     var testOk by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    Panel(Modifier.fillMaxWidth()) {
+    ExpandablePanel(Icons.Default.Sync, stringResource(R.string.sync_test)) {
         Button(
             onClick = {
                 if (testing) return@Button

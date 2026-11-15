@@ -273,6 +273,7 @@
     <string name="pin_label">PIN</string>
     <string name="continue_label">Continue</string>
     <string name="settings_target">Bike: %1$s</string>
+    <string name="current_settings">Current settings</string>
 
     <string name="sync_last_try">Last try %1$s — %2$s</string>
     <string name="sync_err_no_internet">No internet</string>

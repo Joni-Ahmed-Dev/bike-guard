@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.Download
@@ -68,7 +67,6 @@ import com.bikeguard.app.ui.AppViewModel
 import com.bikeguard.app.ui.LocaleHelper
 import com.bikeguard.app.ui.openBatterySettings
 import com.bikeguard.app.ui.theme.Palette
-import com.bikeguard.app.ui.theme.Panel
 import com.bikeguard.app.ui.viewer.OfflineMap
 
 /** Split out of SettingsScreen.kt (v1.2.20): the role-independent sections. */
@@ -82,9 +80,7 @@ fun AppearancePanel() {
     var language by remember { mutableStateOf(prefs.language) }
     var theme by remember { mutableStateOf(prefs.themeMode) }
     val segColors = rememberSegColors()
-    Panel(Modifier.fillMaxWidth()) {
-        PanelHeader(Icons.Default.Settings, stringResource(R.string.appearance_title))
-        Spacer(Modifier.height(12.dp))
+    ExpandablePanel(Icons.Default.Settings, stringResource(R.string.appearance_title)) {
         Text(stringResource(R.string.lang_title), style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         val langs = listOf(LANG_SYSTEM to R.string.lang_system, "en" to R.string.lang_english, "bn" to R.string.lang_bengali)
@@ -120,7 +116,7 @@ fun LockPanel() {
     val prefs = ctx.bikeApp.prefs
     var lock by remember { mutableStateOf(prefs.appLock) }
     var lockMsg by remember { mutableStateOf(false) }
-    Panel(Modifier.fillMaxWidth()) {
+    ExpandablePanel(Icons.Default.Lock, stringResource(R.string.set_lock)) {
         SwitchRow(stringResource(R.string.set_lock), stringResource(R.string.lock_desc), lock, onChange = { on ->
             val ok = BiometricManager.from(ctx).canAuthenticate(BIOMETRIC_WEAK or DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS
             if (on && !ok) lockMsg = true else { lockMsg = false; lock = on; prefs.appLock = on }
@@ -135,9 +131,7 @@ fun SchedulePanel(vm: AppViewModel) {
     val prefs = LocalContext.current.bikeApp.prefs
     var schedStart by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.guardScheduleStart?.toString() ?: prefs.guardScheduleStart.takeIf { it in 0..23 }?.toString() ?: "") }
     var schedEnd by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.guardScheduleEnd?.toString() ?: prefs.guardScheduleEnd.takeIf { it in 0..23 }?.toString() ?: "") }
-    Panel(Modifier.fillMaxWidth()) {
-        PanelHeader(Icons.Default.Schedule, stringResource(R.string.schedule_title))
-        Spacer(Modifier.height(4.dp))
+    ExpandablePanel(Icons.Default.Schedule, stringResource(R.string.schedule_title)) {
         Text(stringResource(R.string.schedule_desc), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
@@ -195,21 +189,13 @@ fun LocalViewerPanel() {
     val ctx = LocalContext.current
     val prefs = ctx.bikeApp.prefs
     var lowData by remember { mutableStateOf(prefs.lowDataMode) }
-    var showRoute by remember { mutableStateOf(prefs.showRouteLine) }
     var dlResult by remember { mutableStateOf<Int?>(null) }
-    Panel(Modifier.fillMaxWidth()) {
+    ExpandablePanel(Icons.Default.DataUsage, stringResource(R.string.lowdata_title)) {
         SwitchRow(stringResource(R.string.lowdata_title), stringResource(R.string.lowdata_desc), lowData, onChange = {
             lowData = it; prefs.lowDataMode = it
         }, icon = Icons.Default.DataUsage)
     }
-    Panel(Modifier.fillMaxWidth()) {
-        SwitchRow(stringResource(R.string.route_line_title), stringResource(R.string.route_line_desc), showRoute, onChange = {
-            showRoute = it; prefs.showRouteLine = it
-        }, icon = Icons.Default.AltRoute)
-    }
-    Panel(Modifier.fillMaxWidth()) {
-        PanelHeader(Icons.Default.Download, stringResource(R.string.offline_dl_title))
-        Spacer(Modifier.height(4.dp))
+    ExpandablePanel(Icons.Default.Download, stringResource(R.string.offline_dl_title)) {
         val hasPos = prefs.lastKnownLat != 0.0 || prefs.lastKnownLng != 0.0
         Text(
             stringResource(if (hasPos) R.string.offline_dl_desc else R.string.offline_dl_no_pos),
@@ -235,9 +221,7 @@ fun LocalViewerPanel() {
 @Composable
 fun BatteryPanel() {
     val ctx = LocalContext.current
-    Panel(Modifier.fillMaxWidth()) {
-        PanelHeader(Icons.Default.BatteryFull, stringResource(R.string.battery_title))
-        Spacer(Modifier.height(6.dp))
+    ExpandablePanel(Icons.Default.BatteryFull, stringResource(R.string.battery_title)) {
         Text(stringResource(R.string.battery_body), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(12.dp))
         LeafOutlinedButton(onClick = { openBatterySettings(ctx) }) { Text(stringResource(R.string.open_settings)) }
@@ -271,9 +255,7 @@ fun SoundsPanel() {
             generalSoundName = Notifier.ringtoneName(ctx, uri.toString())
         }
     }
-    Panel(Modifier.fillMaxWidth()) {
-        PanelHeader(Icons.Default.VolumeUp, stringResource(R.string.notif_sound_title))
-        Spacer(Modifier.height(8.dp))
+    ExpandablePanel(Icons.Default.VolumeUp, stringResource(R.string.notif_sound_title)) {
         RingtoneRow(stringResource(R.string.ringtone_alerts), alertSoundName, onPick = {
             alertSoundPicker.launch(Notifier.ringtonePickerIntent(ctx, alertSound, ctx.getString(R.string.ringtone_pick_title)))
         }, icon = Icons.Default.NotificationsActive)
@@ -307,9 +289,7 @@ fun RolePanel(vm: AppViewModel) {
     var resetPassword by remember { mutableStateOf("") }
     var resetWrong by remember { mutableStateOf(false) }
     var resetBusy by remember { mutableStateOf(false) }
-    Panel(Modifier.fillMaxWidth()) {
-        PanelHeader(Icons.Default.Person, stringResource(R.string.set_role))
-        Spacer(Modifier.height(4.dp))
+    ExpandablePanel(Icons.Default.Person, stringResource(R.string.set_role)) {
         Text(
             stringResource(
                 R.string.role_current,
@@ -410,9 +390,7 @@ fun UpdatePanel(vm: AppViewModel) {
     // v1.2.32: when an update is already known (startup check or an
     // earlier tap), the button says so and tapping it downloads.
     val available = vm.updateAvailable
-    Panel(Modifier.fillMaxWidth()) {
-        PanelHeader(Icons.Default.Update, stringResource(R.string.update_title))
-        Spacer(Modifier.height(4.dp))
+    ExpandablePanel(Icons.Default.Update, stringResource(R.string.update_title)) {
         Text(
             stringResource(R.string.version, BuildConfig.VERSION_NAME),
             color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
@@ -453,9 +431,7 @@ fun UpdatePanel(vm: AppViewModel) {
 // ---- account ----
 @Composable
 fun AccountPanel(vm: AppViewModel) {
-    Panel(Modifier.fillMaxWidth()) {
-        PanelHeader(Icons.Default.AccountCircle, stringResource(R.string.set_account))
-        Spacer(Modifier.height(12.dp))
+    ExpandablePanel(Icons.Default.AccountCircle, stringResource(R.string.set_account)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AccentCircle(Icons.Default.Email)
             Spacer(Modifier.width(12.dp))

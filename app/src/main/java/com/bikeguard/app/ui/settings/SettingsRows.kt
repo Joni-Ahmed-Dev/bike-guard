@@ -2,9 +2,11 @@ package com.bikeguard.app.ui.settings
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -16,6 +18,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -29,15 +34,24 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bikeguard.app.R
 import com.bikeguard.app.ui.theme.Palette
+import com.bikeguard.app.ui.theme.Panel
 
 /** 48dp circle with a 24dp icon — the row pattern from the Dashboard/Alerts rounds. */
 @Composable
@@ -47,13 +61,34 @@ fun AccentCircle(icon: ImageVector, color: Color = Palette.Leaf) {
     }
 }
 
-/** Title row for a settings card: icon circle + bold title. */
+/**
+ * Collapsible settings section (v1.2.35): a header row like Diagnostics —
+ * icon circle + bold title + chevron — that expands inline to show the
+ * section's options. Collapsed by default; only the header row toggles, so
+ * switches and fields inside never collapse the section by accident.
+ */
 @Composable
-fun PanelHeader(icon: ImageVector, title: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        AccentCircle(icon)
-        Spacer(Modifier.width(12.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+fun ExpandablePanel(icon: ImageVector, title: String, content: @Composable ColumnScope.() -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Panel(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable { expanded = !expanded }
+                .semantics(mergeDescendants = true) { role = Role.Button },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AccentCircle(icon)
+            Spacer(Modifier.width(12.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.ChevronRight, null,
+                tint = Palette.Muted, modifier = Modifier.size(24.dp),
+            )
+        }
+        if (expanded) {
+            Spacer(Modifier.height(12.dp))
+            content()
+        }
     }
 }
 

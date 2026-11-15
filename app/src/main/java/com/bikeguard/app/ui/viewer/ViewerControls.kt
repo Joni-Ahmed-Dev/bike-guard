@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Delete
@@ -38,6 +39,7 @@ import com.bikeguard.app.data.isoToMs
 import com.bikeguard.app.ui.agoText
 import com.bikeguard.app.ui.fmtHourMin
 import com.bikeguard.app.ui.rememberNow
+import com.bikeguard.app.ui.settings.SwitchRow
 import com.bikeguard.app.ui.theme.Palette
 import java.time.Instant
 
@@ -89,6 +91,12 @@ fun ViewerControls(vm: ViewerViewModel) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ControlButton(Icons.Default.Warning, R.string.ctl_sos, Modifier.weight(1f), tint = Palette.Danger) { showSos = true }
         }
+        // Route line (v1.2.35): moved here from Settings, so the map's own
+        // toggle lives on the tab that draws the line.
+        SwitchRow(
+            stringResource(R.string.route_line_title), stringResource(R.string.route_line_desc),
+            vm.showRouteLine, onChange = { vm.setShowRouteLine(it) }, icon = Icons.Default.AltRoute,
+        )
         vm.commandNote?.let { Text(stringResource(it), color = Palette.Muted, style = MaterialTheme.typography.labelMedium) }
     }
 

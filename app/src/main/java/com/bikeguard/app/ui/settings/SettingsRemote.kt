@@ -50,7 +50,6 @@ import com.bikeguard.app.tracker.AutoMode
 import com.bikeguard.app.ui.AppViewModel
 import com.bikeguard.app.ui.agoText
 import com.bikeguard.app.ui.theme.Palette
-import com.bikeguard.app.ui.theme.Panel
 
 /** Split out of SettingsScreen.kt (v1.2.20): the Remote-only editable sections. Each keeps its own server-keyed mirrors, exactly as before, so behavior is unchanged. */
 
@@ -59,12 +58,10 @@ import com.bikeguard.app.ui.theme.Panel
 fun SyncStatusPanel(vm: AppViewModel, now: Long) {
     val ctx = LocalContext.current
     val watched = vm.watchedDevice
-    Panel(Modifier.fillMaxWidth()) {
-        PanelHeader(
-            Icons.Default.Sync,
-            stringResource(R.string.settings_target, watched?.name ?: vm.settingsTargetId.take(8)),
-        )
-        Spacer(Modifier.height(12.dp))
+    ExpandablePanel(
+        Icons.Default.Sync,
+        stringResource(R.string.settings_target, watched?.name ?: vm.settingsTargetId.take(8)),
+    ) {
         // Which device row is being watched: model + short id + last seen,
         // so a re-registered tracker is visible here instead of a
         // silent stale target.
@@ -110,9 +107,7 @@ fun ModePanel(vm: AppViewModel) {
         if (m == MODE_AUTO && !AutoMode.hasPermission(ctx)) activityPerm.launch(Manifest.permission.ACTIVITY_RECOGNITION)
         else { autoDenied = false; vm.updateMode(m) }
     }
-    Panel(Modifier.fillMaxWidth()) {
-        PanelHeader(Icons.Default.Tune, stringResource(R.string.set_mode))
-        Spacer(Modifier.height(12.dp))
+    ExpandablePanel(Icons.Default.Tune, stringResource(R.string.set_mode)) {
         val modes = listOf(MODE_MANUAL to R.string.mode_manual, MODE_AUTO to R.string.mode_auto, MODE_ALWAYS to R.string.mode_always)
         // 48dp rows (v1.2.20): the Material3 default segmented row is 40dp.
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().height(48.dp)) {
@@ -136,9 +131,7 @@ fun ModePanel(vm: AppViewModel) {
 @Composable
 fun IntervalPanel(vm: AppViewModel) {
     val segColors = rememberSegColors()
-    Panel(Modifier.fillMaxWidth()) {
-        PanelHeader(Icons.Default.Timer, stringResource(R.string.set_interval))
-        Spacer(Modifier.height(12.dp))
+    ExpandablePanel(Icons.Default.Timer, stringResource(R.string.set_interval)) {
         val options = listOf(5, 7, 10)
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().height(48.dp)) {
             options.forEachIndexed { i, sec ->
@@ -159,9 +152,7 @@ fun GuardPanel(vm: AppViewModel) {
     val prefs = LocalContext.current.bikeApp.prefs
     var autoArm by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.autoArm ?: prefs.autoArm) }
     var siren by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.sirenOnAlert ?: prefs.sirenOnAlert) }
-    Panel(Modifier.fillMaxWidth()) {
-        PanelHeader(Icons.Default.Lock, stringResource(R.string.set_guard))
-        Spacer(Modifier.height(8.dp))
+    ExpandablePanel(Icons.Default.Lock, stringResource(R.string.set_guard)) {
         SwitchRow(stringResource(R.string.guard_auto), null, autoArm, onChange = { autoArm = it; prefs.autoArm = it; vm.pushSettingsPatch(autoArm = it) }, icon = Icons.Default.Shield)
         SettingsDivider()
         SwitchRow(stringResource(R.string.guard_siren), null, siren, onChange = { siren = it; prefs.sirenOnAlert = it; vm.pushSettingsPatch(sirenOnAlert = it) }, icon = Icons.Default.NotificationsActive)
@@ -186,9 +177,7 @@ fun SafetyPanel(vm: AppViewModel) {
         smsPermOk = ok
         if (ok) { sms = true; prefs.sosSms = true; vm.pushSettingsPatch(sosSms = true) }
     }
-    Panel(Modifier.fillMaxWidth()) {
-        PanelHeader(Icons.Default.Security, stringResource(R.string.set_safety))
-        Spacer(Modifier.height(8.dp))
+    ExpandablePanel(Icons.Default.Security, stringResource(R.string.set_safety)) {
         SwitchRow(stringResource(R.string.safety_crash), null, crash, onChange = { crash = it; prefs.crashDetection = it; vm.pushSettingsPatch(crashEnabled = it) }, icon = Icons.Default.CarCrash)
         SettingsDivider()
         SwitchRow(stringResource(R.string.safety_sms), stringResource(R.string.safety_sms_hint), sms, onChange = { on ->
@@ -243,9 +232,7 @@ fun ServicePanel(vm: AppViewModel) {
     val ctx = LocalContext.current
     val prefs = ctx.bikeApp.prefs
     var serviceEvery by remember(vm.remoteSettings) { mutableIntStateOf(vm.remoteSettings?.serviceKm ?: prefs.serviceIntervalKm) }
-    Panel(Modifier.fillMaxWidth()) {
-        PanelHeader(Icons.Default.Build, stringResource(R.string.set_service))
-        Spacer(Modifier.height(8.dp))
+    ExpandablePanel(Icons.Default.Build, stringResource(R.string.set_service)) {
         ChipRow(
             listOf(0, 1000, 2000, 3000, 5000), serviceEvery,
             { if (it == 0) ctx.getString(R.string.service_off) else ctx.getString(R.string.service_every, it) },
