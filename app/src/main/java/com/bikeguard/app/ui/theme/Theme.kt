@@ -2,7 +2,6 @@ package com.bikeguard.app.ui.theme
 
 import android.content.Context
 import android.content.res.Configuration
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.padding
@@ -29,7 +28,11 @@ import com.bikeguard.app.bikeApp
 import com.bikeguard.app.data.THEME_DARK
 import com.bikeguard.app.data.THEME_LIGHT
 
-/** Instrument-panel palette: deep ink, amber warning-light primary, cyan "signal" for live state. */
+/**
+ * Master design reference (v1.2.23): pale grey-green page (#F1F4F0), white cards,
+ * near-black text (#111111), mint primary (#91E9AD), teal live signal (#54CDBA),
+ * peach warning (#FFC178). Dark values are unchanged from before.
+ */
 object Palette {
     /**
      * Set by BikeGuardTheme (and by MainActivity before the first composition).
@@ -40,7 +43,7 @@ object Palette {
      */
     var isLight by mutableStateOf(false)
 
-    // Dark values (the look up to v1.2.19) and light values (sunlight option).
+    // Dark values (the look up to v1.2.19) and light values (master design reference).
     private val DarkInk = Color(0xFF0B0F17)
     private val DarkSurface = Color(0xFF121826)
     private val DarkCard = Color(0xFF182032)
@@ -51,15 +54,16 @@ object Palette {
     private val DarkText = Color(0xFFEAF0F8)
     private val DarkMuted = Color(0xFF8A97AB)
 
-    private val LightInk = Color(0xFFF6F7F9)
+    private val LightInk = Color(0xFFF1F4F0)
     private val LightSurface = Color(0xFFFFFFFF)
     private val LightCard = Color(0xFFFFFFFF)
-    private val LightStroke = Color(0x1F000000)
-    private val LightEmber = Color(0xFFD97E06)
-    private val LightSignal = Color(0xFF0B7D78)
+    private val LightStroke = Color(0xFFE3E8E3)
+    private val LightEmber = Color(0xFF91E9AD)
+    private val LightSignal = Color(0xFF54CDBA)
     private val LightDanger = Color(0xFFD92D20)
-    private val LightText = Color(0xFF101828)
-    private val LightMuted = Color(0xFF5B6B7F)
+    private val LightText = Color(0xFF111111)
+    private val LightMuted = Color(0xFF6B7A6E)
+    private val LightWarn = Color(0xFFFFC178)
 
     val Ink get() = if (isLight) LightInk else DarkInk
     val Surface get() = if (isLight) LightSurface else DarkSurface
@@ -70,6 +74,8 @@ object Palette {
     val Danger get() = if (isLight) LightDanger else DarkDanger
     val Text get() = if (isLight) LightText else DarkText
     val Muted get() = if (isLight) LightMuted else DarkMuted
+    // Warning states that must stay amber/peach even though the primary is now mint.
+    val Warn get() = if (isLight) LightWarn else DarkEmber
 }
 
 /** Whether the app should currently draw the light theme: the stored mode, with "system" following the phone. */
@@ -80,13 +86,13 @@ fun isLightMode(context: Context): Boolean = when (context.bikeApp.prefs.themeMo
 }
 
 private fun schemeFor(light: Boolean): ColorScheme = if (light) lightColorScheme(
-    primary = Color(0xFFD97E06), onPrimary = Color(0xFFFFFFFF),
-    secondary = Color(0xFF0B7D78), onSecondary = Color(0xFFFFFFFF),
-    background = Color(0xFFF6F7F9), onBackground = Color(0xFF101828),
-    surface = Color(0xFFFFFFFF), onSurface = Color(0xFF101828),
-    surfaceVariant = Color(0xFFFFFFFF), onSurfaceVariant = Color(0xFF5B6B7F),
-    surfaceContainer = Color(0xFFFFFFFF), surfaceContainerHigh = Color(0xFFF0F2F5),
-    error = Color(0xFFD92D20), outline = Color(0xFF5B6B7F), outlineVariant = Color(0x1F000000),
+    primary = Color(0xFF91E9AD), onPrimary = Color(0xFF111111),
+    secondary = Color(0xFF54CDBA), onSecondary = Color(0xFF111111),
+    background = Color(0xFFF1F4F0), onBackground = Color(0xFF111111),
+    surface = Color(0xFFFFFFFF), onSurface = Color(0xFF111111),
+    surfaceVariant = Color(0xFFFFFFFF), onSurfaceVariant = Color(0xFF6B7A6E),
+    surfaceContainer = Color(0xFFFFFFFF), surfaceContainerHigh = Color(0xFFE9EEE9),
+    error = Color(0xFFD92D20), outline = Color(0xFF6B7A6E), outlineVariant = Color(0xFFE3E8E3),
 ) else darkColorScheme(
     primary = Color(0xFFFF9F1C), onPrimary = Color(0xFF0B0F17),
     secondary = Color(0xFF3DDBD9), onSecondary = Color(0xFF0B0F17),
@@ -120,8 +126,8 @@ fun BikeGuardTheme(content: @Composable () -> Unit) {
 fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(22.dp),
-        color = Palette.Card.copy(alpha = 0.94f),
-        border = BorderStroke(1.dp, Palette.Stroke),
+        shape = RoundedCornerShape(24.dp),
+        color = Palette.Card,
+        shadowElevation = 2.dp,
     ) { Column(Modifier.padding(16.dp), content = content) }
 }

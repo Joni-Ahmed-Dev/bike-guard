@@ -1,20 +1,32 @@
 package com.bikeguard.app.ui.dashboard
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.DirectionsBike
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -81,7 +93,7 @@ fun DashboardScreen(
     val statusColor = when {
         age == null -> Palette.Muted
         age < 240_000 -> Palette.Signal
-        age < 900_000 -> Palette.Ember
+        age < 900_000 -> Palette.Warn
         else -> Palette.Muted
     }
 
@@ -130,16 +142,29 @@ fun DashboardScreen(
         modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            stringResource(R.string.tab_dashboard), style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(top = 16.dp),
-        )
+        // Title row. The bell is VISUAL ONLY in this round: no onClick, no navigation.
+        Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.tab_dashboard), style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(Icons.Default.Notifications, null, tint = Palette.Text, modifier = Modifier.size(26.dp))
+        }
 
         // ---- status + quick buttons ----
         Panel(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(device?.name.orEmpty(), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                Text(stringResource(statusText), color = statusColor, style = MaterialTheme.typography.labelMedium)
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = if (Palette.isLight) Color(0xFFF1F4F0) else Color(0xFF232B3A),
+                ) {
+                    Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(8.dp).background(statusColor, CircleShape))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(statusText), color = Palette.Text, style = MaterialTheme.typography.labelMedium)
+                    }
+                }
             }
             Spacer(Modifier.height(4.dp))
             Text(
@@ -149,16 +174,16 @@ fun DashboardScreen(
             )
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                QuickButton(R.string.ctl_locate, Icons.Default.MyLocation, Modifier.weight(1f)) { vm.send("locate") }
-                QuickButton(R.string.ctl_live, Icons.Default.Bolt, Modifier.weight(1f)) { vm.send("live") }
+                QuickButton(R.string.ctl_locate, Icons.Default.MyLocation, Color(0xFF91E9AD), Modifier.weight(1f)) { vm.send("locate") }
+                QuickButton(R.string.ctl_live, Icons.Default.Bolt, Color(0xFFFFD66D), Modifier.weight(1f)) { vm.send("live") }
                 QuickButton(
                     if (vm.sirenOn) R.string.ctl_siren_stop else R.string.ctl_siren,
-                    Icons.Default.NotificationsActive, Modifier.weight(1f),
+                    Icons.Default.NotificationsActive, Color(0xFFFFC178), Modifier.weight(1f),
                 ) { vm.send(if (vm.sirenOn) "siren_off" else "siren_on") }
                 val armed = device?.armed == true
                 QuickButton(
                     if (armed) R.string.ctl_disarm else R.string.ctl_arm,
-                    if (armed) Icons.Default.LockOpen else Icons.Default.Lock, Modifier.weight(1f),
+                    if (armed) Icons.Default.LockOpen else Icons.Default.Lock, Color(0xFFBCD9F9), Modifier.weight(1f),
                 ) { vm.send(if (armed) "disarm" else "arm") }
             }
             vm.commandNote?.let {
@@ -171,6 +196,8 @@ fun DashboardScreen(
         if (isRemote) {
             Panel(Modifier.fillMaxWidth()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    AccentCircle(Icons.Default.MyLocation)
+                    Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(stringResource(R.string.ring_tracking), style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(2.dp))
@@ -190,7 +217,10 @@ fun DashboardScreen(
                             remoteTrackingOn = on // optimistic; the pending state holds it until the tracker confirms
                             vm.send(if (on) "tracking_start" else "tracking_stop")
                         },
-                        colors = SwitchDefaults.colors(checkedTrackColor = Palette.Ember, checkedThumbColor = Palette.Ink),
+                        colors = SwitchDefaults.colors(
+                            checkedTrackColor = Palette.Ember,
+                            checkedThumbColor = if (Palette.isLight) Color(0xFF111111) else Palette.Ink,
+                        ),
                     )
                 }
                 // A queued switch tap, or a tracker that has gone quiet: say so, instead of
@@ -214,7 +244,7 @@ fun DashboardScreen(
         // ---- small map ----
         Panel(Modifier.fillMaxWidth()) {
             BikeMap(
-                modifier = Modifier.fillMaxWidth().height(208.dp),
+                modifier = Modifier.fillMaxWidth().height(208.dp).clip(RoundedCornerShape(12.dp)),
                 position = latest?.let { LatLng(it.lat, it.lng) },
                 bearing = latest?.bearing ?: 0f,
                 moving = (latest?.speed ?: 0f) > 1f && latest?.bearing != null,
@@ -231,24 +261,24 @@ fun DashboardScreen(
         // ---- phone info ----
         Panel(Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Mini(stringResource(R.string.stat_battery), latest?.battery?.let { "$it%" } ?: stringResource(R.string.none), Modifier.weight(1f))
-                Mini(stringResource(R.string.stat_accuracy), latest?.accuracy?.let { stringResource(R.string.unit_m, it.toInt()) } ?: stringResource(R.string.none), Modifier.weight(1f))
-                Mini(stringResource(R.string.stat_speed), latest?.speed?.let { stringResource(R.string.unit_kmh, (it * 3.6f).toInt()) } ?: stringResource(R.string.none), Modifier.weight(1f))
+                Mini(Icons.Default.BatteryFull, stringResource(R.string.stat_battery), latest?.battery?.let { "$it%" } ?: stringResource(R.string.none), Modifier.weight(1f))
+                Mini(Icons.Default.MyLocation, stringResource(R.string.stat_accuracy), latest?.accuracy?.let { stringResource(R.string.unit_m, it.toInt()) } ?: stringResource(R.string.none), Modifier.weight(1f))
+                Mini(Icons.Default.Speed, stringResource(R.string.stat_speed), latest?.speed?.let { stringResource(R.string.unit_kmh, (it * 3.6f).toInt()) } ?: stringResource(R.string.none), Modifier.weight(1f))
             }
         }
 
         // ---- today's ride ----
         Panel(Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.dash_today), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(6.dp))
-            if (today.isEmpty()) {
-                Text(stringResource(R.string.dash_no_ride), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
-            } else {
-                Text(
-                    "${fmtKm(ctx, todayKm)}  ·  ${fmtDuration(ctx, todayMs)}  ·  " +
-                        stringResource(R.string.trip_max, todayMax.toInt()),
-                    style = MaterialTheme.typography.titleLarge, color = Palette.Ember,
-                )
+            InfoRow(Icons.Default.DirectionsBike, stringResource(R.string.dash_today)) {
+                if (today.isEmpty()) {
+                    Text(stringResource(R.string.dash_no_ride), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    Text(
+                        "${fmtKm(ctx, todayKm)}  ·  ${fmtDuration(ctx, todayMs)}  ·  " +
+                            stringResource(R.string.trip_max, todayMax.toInt()),
+                        style = MaterialTheme.typography.titleLarge, color = Palette.Text,
+                    )
+                }
             }
         }
 
@@ -256,45 +286,47 @@ fun DashboardScreen(
         val odo = device?.odometerKm ?: 0.0
         if (odo > 0) {
             Panel(Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.odo_line, odo.toInt()), style = MaterialTheme.typography.titleMedium)
-                val svc = device?.nextServiceKm?.takeIf { it > 0 }?.let { n ->
-                    val left = (n - odo).toInt()
-                    if (left >= 0) stringResource(R.string.service_in, left) else stringResource(R.string.service_overdue)
-                }
-                if (svc != null) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(svc, color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+                InfoRow(Icons.Default.Speed, stringResource(R.string.odo_line, odo.toInt())) {
+                    val svc = device?.nextServiceKm?.takeIf { it > 0 }?.let { n ->
+                        val left = (n - odo).toInt()
+                        if (left >= 0) stringResource(R.string.service_in, left) else stringResource(R.string.service_overdue)
+                    }
+                    if (svc != null) {
+                        Text(svc, color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
         }
 
         // ---- tracker health ----
         Panel(Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.dash_health), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(6.dp))
-            // No device, or no location ever received: the health is unknown, never "healthy".
-            val hasData = device != null && latest != null
-            if (!hasData) {
-                Text(stringResource(R.string.dash_health_unknown), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
-            } else if (healthBad && healthEvent != null) {
-                Text(eventTitle(ctx, healthEvent.type, healthEvent.data?.toString()), color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
-                Text(agoText(ctx, healthEvent.createdMs, now), color = Palette.Muted, style = MaterialTheme.typography.labelMedium)
-            } else {
-                Text(stringResource(R.string.dash_health_ok), color = Palette.Signal, style = MaterialTheme.typography.bodyMedium)
+            InfoRow(Icons.Default.Favorite, stringResource(R.string.dash_health)) {
+                // No device, or no location ever received: the health is unknown, never "healthy".
+                val hasData = device != null && latest != null
+                if (!hasData) {
+                    Text(stringResource(R.string.dash_health_unknown), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+                } else if (healthBad && healthEvent != null) {
+                    Text(eventTitle(ctx, healthEvent.type, healthEvent.data?.toString()), color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
+                    Text(agoText(ctx, healthEvent.createdMs, now), color = Palette.Muted, style = MaterialTheme.typography.labelMedium)
+                } else {
+                    Text(stringResource(R.string.dash_health_ok), color = Palette.Text, style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
 
         // ---- where I parked ----
         Panel(Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.dash_park_title), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(6.dp))
-            if (spot == null) {
-                Text(stringResource(R.string.dash_park_none), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
-            } else {
-                Text(
-                    "${spot!!.lat}, ${spot!!.lng}",
-                    color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
-                )
+            InfoRow(Icons.Default.LocationOn, stringResource(R.string.dash_park_title)) {
+                if (spot == null) {
+                    Text(stringResource(R.string.dash_park_none), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    Text(
+                        "${spot!!.lat}, ${spot!!.lng}",
+                        color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+            if (spot != null) {
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = note, onValueChange = { note = it; noteSaved = false }, singleLine = true,
@@ -320,13 +352,18 @@ fun DashboardScreen(
 
         // ---- recent alerts ----
         Panel(Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.dash_alerts), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AccentCircle(Icons.Default.Notifications)
+                Spacer(Modifier.width(12.dp))
+                Text(stringResource(R.string.dash_alerts), style = MaterialTheme.typography.titleMedium)
+            }
+            Spacer(Modifier.height(8.dp))
             val recent = alerts.events.take(3)
             if (recent.isEmpty()) {
                 Text(stringResource(R.string.alerts_empty_title), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
             } else {
-                recent.forEach { e ->
+                recent.forEachIndexed { index, e ->
+                    if (index > 0) HorizontalDivider(color = Palette.Stroke)
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
                         Column(Modifier.weight(1f)) {
                             Text(eventTitle(ctx, e.type, e.data?.toString()), style = MaterialTheme.typography.bodyMedium)
@@ -340,24 +377,75 @@ fun DashboardScreen(
     }
 }
 
+/** 48.dp mint circle with a black icon (light) / mint-on-translucent-mint icon (dark). */
 @Composable
-private fun Mini(label: String, value: String, modifier: Modifier = Modifier) {
+private fun AccentCircle(icon: ImageVector) {
+    Box(
+        Modifier.size(48.dp).background(
+            if (Palette.isLight) Color(0xFF91E9AD) else Color(0xFF91E9AD).copy(alpha = 0.16f),
+            CircleShape,
+        ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon, null,
+            tint = if (Palette.isLight) Color(0xFF111111) else Color(0xFF91E9AD),
+            modifier = Modifier.size(24.dp),
+        )
+    }
+}
+
+/**
+ * Shared row-card layout: mint icon circle, title + optional subtitle, and a chevron.
+ * The chevron is VISUAL ONLY in this round: these rows do not navigate anywhere yet.
+ */
+@Composable
+private fun InfoRow(icon: ImageVector, title: String, subtitle: @Composable (ColumnScope.() -> Unit)? = null) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        AccentCircle(icon)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            if (subtitle != null) {
+                Spacer(Modifier.height(2.dp))
+                subtitle()
+            }
+        }
+        Icon(Icons.Default.ChevronRight, null, tint = Palette.Muted)
+    }
+}
+
+@Composable
+private fun Mini(icon: ImageVector, label: String, value: String, modifier: Modifier = Modifier) {
     Column(modifier) {
-        Text(label, color = Palette.Muted, style = MaterialTheme.typography.labelMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = Palette.Text, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(label, color = Palette.Muted, style = MaterialTheme.typography.labelMedium)
+        }
         Spacer(Modifier.height(2.dp))
         Text(value, style = MaterialTheme.typography.titleMedium, maxLines = 1)
     }
 }
 
 @Composable
-private fun QuickButton(label: Int, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, onClick: () -> Unit) {
-    Button(
-        onClick = onClick, modifier = modifier.height(48.dp),
-        shape = RoundedCornerShape(14.dp),
-        contentPadding = PaddingValues(horizontal = 4.dp),
+private fun QuickButton(label: Int, icon: ImageVector, accent: Color, modifier: Modifier, onClick: () -> Unit) {
+    // Light: full-strength accent tint with black icon + label. Dark: the same accent
+    // at 16% alpha over the dark card, icon + label in the full-strength accent.
+    val tint = if (Palette.isLight) accent else accent.copy(alpha = 0.16f)
+    val fg = if (Palette.isLight) Color(0xFF111111) else accent
+    Surface(
+        onClick = onClick, modifier = modifier.height(72.dp),
+        shape = RoundedCornerShape(16.dp), color = tint,
     ) {
-        Icon(icon, null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(4.dp))
-        Text(stringResource(label), style = MaterialTheme.typography.labelMedium, maxLines = 1)
+        Column(
+            Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(icon, null, tint = fg, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.height(4.dp))
+            Text(stringResource(label), color = fg, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+        }
     }
 }

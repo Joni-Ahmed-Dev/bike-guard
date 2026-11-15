@@ -18,7 +18,7 @@ const val ROLE_REMOTE = "remote"
 
 /** In-app language (v1.2.20): "" = system, "en" = English, "bn" = Bengali. */
 const val LANG_SYSTEM = ""
-/** Theme (v1.2.20): "dark" is the default, as before; "light" is the sunlight option; "system" follows the phone. */
+/** Theme (v1.2.23): "light" is the default; "dark" is the dark option; "system" follows the phone. */
 const val THEME_DARK = "dark"
 const val THEME_LIGHT = "light"
 const val THEME_SYSTEM = "system"
@@ -159,11 +159,11 @@ class Prefs(private val context: Context) {
     var language: String
         get() = sp.getString("language", LANG_SYSTEM) ?: LANG_SYSTEM
         set(v) = sp.edit { putString("language", v) }
-    /** Theme (v1.2.20): THEME_DARK (the default, as before), THEME_LIGHT for
-     *  sunlight, THEME_SYSTEM to follow the phone. Changing it recreates the
+    /** Theme (v1.2.23): THEME_LIGHT is the default, THEME_DARK for dark mode,
+     *  THEME_SYSTEM to follow the phone. Changing it recreates the
      *  activity, so the status-bar style and window background follow too. */
     var themeMode: String
-        get() = sp.getString("theme_mode", THEME_DARK) ?: THEME_DARK
+        get() = sp.getString("theme_mode", THEME_LIGHT) ?: THEME_LIGHT
         set(v) = sp.edit { putString("theme_mode", v) }
 
     // ---- odometer and service reminder ----

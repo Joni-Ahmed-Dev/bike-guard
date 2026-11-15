@@ -2,6 +2,7 @@ package com.bikeguard.app.ui
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.GpsFixed
@@ -19,6 +20,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,8 +32,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -133,27 +137,34 @@ private fun HomeScreen(vm: AppViewModel, alerts: AlertsViewModel = viewModel()) 
     Scaffold(
         containerColor = Palette.Ink,
         bottomBar = {
-            NavigationBar(containerColor = Palette.Surface) {
-                tabs.forEachIndexed { index, item ->
-                    NavigationBarItem(
-                        selected = tab == index,
-                        onClick = { tab = index },
-                        icon = {
-                            if (item.id == "alerts" && alerts.unread > 0) {
-                                BadgedBox(badge = { Badge { Text(alerts.unread.coerceAtMost(99).toString()) } }) {
+            Surface(
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
+                shape = RoundedCornerShape(28.dp),
+                color = Palette.Surface,
+                shadowElevation = 6.dp,
+            ) {
+                NavigationBar(containerColor = Color.Transparent) {
+                    tabs.forEachIndexed { index, item ->
+                        NavigationBarItem(
+                            selected = tab == index,
+                            onClick = { tab = index },
+                            icon = {
+                                if (item.id == "alerts" && alerts.unread > 0) {
+                                    BadgedBox(badge = { Badge { Text(alerts.unread.coerceAtMost(99).toString()) } }) {
+                                        Icon(item.icon, contentDescription = null)
+                                    }
+                                } else {
                                     Icon(item.icon, contentDescription = null)
                                 }
-                            } else {
-                                Icon(item.icon, contentDescription = null)
-                            }
-                        },
-                        label = { Text(stringResource(item.label), maxLines = 1) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Palette.Ember, selectedTextColor = Palette.Ember,
-                            indicatorColor = Palette.Ember.copy(alpha = 0.16f),
-                            unselectedIconColor = Palette.Muted, unselectedTextColor = Palette.Muted,
+                            },
+                            label = { Text(stringResource(item.label), maxLines = 1) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = Color(0xFF111111), selectedTextColor = Color(0xFF111111),
+                                indicatorColor = Color(0xFF91E9AD),
+                                unselectedIconColor = Palette.Muted, unselectedTextColor = Palette.Muted,
+                            )
                         )
-                    )
+                    }
                 }
             }
         }
