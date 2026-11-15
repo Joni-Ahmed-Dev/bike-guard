@@ -1,8 +1,20 @@
 package com.bikeguard.app.ui.settings
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CarCrash
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocalParking
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -15,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -35,7 +48,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun TrackerNoticePanel() {
     Panel(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.tracker_view_only), color = Palette.Ember, style = MaterialTheme.typography.bodyMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AccentCircle(Icons.Default.Info)
+            Spacer(Modifier.width(12.dp))
+            // Leaf, not Ember: the primary is mint in light mode and mint text
+            // on white is unreadable.
+            Text(stringResource(R.string.tracker_view_only), color = Palette.Leaf, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        }
     }
 }
 
@@ -52,14 +71,21 @@ fun TrackerReadOnlyPanel(vm: AppViewModel) {
             MODE_MANUAL -> R.string.mode_manual
             MODE_AUTO -> R.string.mode_auto
             else -> R.string.mode_always
-        }))
-        ReadOnlyRow(stringResource(R.string.set_interval), stringResource(R.string.interval_s, vm.intervalSec))
-        ReadOnlyRow(stringResource(R.string.limit_title), if (limit == 0) stringResource(R.string.limit_off) else stringResource(R.string.limit_kmh, limit))
-        ReadOnlyRow(stringResource(R.string.guard_parking), if (prefs.parkingArmed) stringResource(R.string.ctl_arm) else stringResource(R.string.ctl_disarm))
-        ReadOnlyRow(stringResource(R.string.guard_auto), if (autoArm) stringResource(R.string.ctl_arm) else stringResource(R.string.ctl_disarm))
-        ReadOnlyRow(stringResource(R.string.safety_crash), if (crash) stringResource(R.string.ctl_arm) else stringResource(R.string.ctl_disarm))
-        ReadOnlyRow(stringResource(R.string.safety_number), number.ifBlank { stringResource(R.string.none) })
-        ReadOnlyRow(stringResource(R.string.set_service), if (serviceEvery == 0) stringResource(R.string.service_off) else stringResource(R.string.service_every, serviceEvery))
+        }), icon = Icons.Default.Tune)
+        SettingsDivider()
+        ReadOnlyRow(stringResource(R.string.set_interval), stringResource(R.string.interval_s, vm.intervalSec), icon = Icons.Default.Timer)
+        SettingsDivider()
+        ReadOnlyRow(stringResource(R.string.limit_title), if (limit == 0) stringResource(R.string.limit_off) else stringResource(R.string.limit_kmh, limit), icon = Icons.Default.Speed)
+        SettingsDivider()
+        ReadOnlyRow(stringResource(R.string.guard_parking), if (prefs.parkingArmed) stringResource(R.string.ctl_arm) else stringResource(R.string.ctl_disarm), icon = Icons.Default.LocalParking)
+        SettingsDivider()
+        ReadOnlyRow(stringResource(R.string.guard_auto), if (autoArm) stringResource(R.string.ctl_arm) else stringResource(R.string.ctl_disarm), icon = Icons.Default.Shield)
+        SettingsDivider()
+        ReadOnlyRow(stringResource(R.string.safety_crash), if (crash) stringResource(R.string.ctl_arm) else stringResource(R.string.ctl_disarm), icon = Icons.Default.CarCrash)
+        SettingsDivider()
+        ReadOnlyRow(stringResource(R.string.safety_number), number.ifBlank { stringResource(R.string.none) }, icon = Icons.Default.Phone)
+        SettingsDivider()
+        ReadOnlyRow(stringResource(R.string.set_service), if (serviceEvery == 0) stringResource(R.string.service_off) else stringResource(R.string.service_every, serviceEvery), icon = Icons.Default.Build)
     }
 }
 
@@ -95,7 +121,7 @@ fun TrackerSyncTestPanel() {
                     testing = false
                 }
             },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
         ) { Text(stringResource(if (testing) R.string.sync_test_checking else R.string.sync_test)) }
         testResult?.let {
             Spacer(Modifier.height(8.dp))

@@ -13,18 +13,35 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AltRoute
+import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.DataUsage
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Update
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,7 +83,7 @@ fun AppearancePanel() {
     var theme by remember { mutableStateOf(prefs.themeMode) }
     val segColors = rememberSegColors()
     Panel(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.appearance_title), style = MaterialTheme.typography.titleMedium)
+        PanelHeader(Icons.Default.Settings, stringResource(R.string.appearance_title))
         Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.lang_title), style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
@@ -104,7 +121,7 @@ fun LockPanel() {
     var lock by remember { mutableStateOf(prefs.appLock) }
     var lockMsg by remember { mutableStateOf(false) }
     Panel(Modifier.fillMaxWidth()) {
-        SwitchRow(stringResource(R.string.set_lock), stringResource(R.string.lock_desc), lock) { on ->
+        SwitchRow(stringResource(R.string.set_lock), stringResource(R.string.lock_desc), lock, icon = Icons.Default.Lock) { on ->
             val ok = BiometricManager.from(ctx).canAuthenticate(BIOMETRIC_WEAK or DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS
             if (on && !ok) lockMsg = true else { lockMsg = false; lock = on; prefs.appLock = on }
         }
@@ -119,7 +136,7 @@ fun SchedulePanel(vm: AppViewModel) {
     var schedStart by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.guardScheduleStart?.toString() ?: prefs.guardScheduleStart.takeIf { it in 0..23 }?.toString() ?: "") }
     var schedEnd by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.guardScheduleEnd?.toString() ?: prefs.guardScheduleEnd.takeIf { it in 0..23 }?.toString() ?: "") }
     Panel(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.schedule_title), style = MaterialTheme.typography.titleMedium)
+        PanelHeader(Icons.Default.Schedule, stringResource(R.string.schedule_title))
         Spacer(Modifier.height(4.dp))
         Text(stringResource(R.string.schedule_desc), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(12.dp))
@@ -128,6 +145,12 @@ fun SchedulePanel(vm: AppViewModel) {
                 value = schedStart, onValueChange = { schedStart = it.filter { c -> c.isDigit() }.take(2) },
                 singleLine = true, label = { Text(stringResource(R.string.schedule_start)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Palette.Card, unfocusedContainerColor = Palette.Card,
+                    focusedBorderColor = Palette.Leaf, unfocusedBorderColor = Palette.Stroke,
+                    cursorColor = Palette.Text,
+                ),
                 modifier = Modifier.weight(1f).onFocusChanged {
                     if (!it.isFocused) {
                         val h = schedStart.toIntOrNull()?.takeIf { h -> h in 0..23 }
@@ -141,6 +164,12 @@ fun SchedulePanel(vm: AppViewModel) {
                 value = schedEnd, onValueChange = { schedEnd = it.filter { c -> c.isDigit() }.take(2) },
                 singleLine = true, label = { Text(stringResource(R.string.schedule_end)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Palette.Card, unfocusedContainerColor = Palette.Card,
+                    focusedBorderColor = Palette.Leaf, unfocusedBorderColor = Palette.Stroke,
+                    cursorColor = Palette.Text,
+                ),
                 modifier = Modifier.weight(1f).onFocusChanged {
                     if (!it.isFocused) {
                         val h = schedEnd.toIntOrNull()?.takeIf { h -> h in 0..23 }
@@ -152,7 +181,7 @@ fun SchedulePanel(vm: AppViewModel) {
             )
         }
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = {
+        LeafTextButton(onClick = {
             schedStart = ""; schedEnd = ""
             prefs.guardScheduleStart = -1; prefs.guardScheduleEnd = -1
             vm.pushSettingsPatch(clearScheduleStart = true, clearScheduleEnd = true)
@@ -169,17 +198,17 @@ fun LocalViewerPanel() {
     var showRoute by remember { mutableStateOf(prefs.showRouteLine) }
     var dlResult by remember { mutableStateOf<Int?>(null) }
     Panel(Modifier.fillMaxWidth()) {
-        SwitchRow(stringResource(R.string.lowdata_title), stringResource(R.string.lowdata_desc), lowData) {
+        SwitchRow(stringResource(R.string.lowdata_title), stringResource(R.string.lowdata_desc), lowData, icon = Icons.Default.DataUsage) {
             lowData = it; prefs.lowDataMode = it
         }
     }
     Panel(Modifier.fillMaxWidth()) {
-        SwitchRow(stringResource(R.string.route_line_title), stringResource(R.string.route_line_desc), showRoute) {
+        SwitchRow(stringResource(R.string.route_line_title), stringResource(R.string.route_line_desc), showRoute, icon = Icons.Default.AltRoute) {
             showRoute = it; prefs.showRouteLine = it
         }
     }
     Panel(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.offline_dl_title), style = MaterialTheme.typography.titleMedium)
+        PanelHeader(Icons.Default.Download, stringResource(R.string.offline_dl_title))
         Spacer(Modifier.height(4.dp))
         val hasPos = prefs.lastKnownLat != 0.0 || prefs.lastKnownLng != 0.0
         Text(
@@ -193,7 +222,7 @@ fun LocalViewerPanel() {
                 OfflineMap.downloadAround(ctx, prefs.lastKnownLat, prefs.lastKnownLng) { dlResult = it }
             },
             enabled = hasPos,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
         ) { Text(stringResource(R.string.offline_dl_title)) }
         dlResult?.let {
             Spacer(Modifier.height(8.dp))
@@ -207,11 +236,11 @@ fun LocalViewerPanel() {
 fun BatteryPanel() {
     val ctx = LocalContext.current
     Panel(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.battery_title), style = MaterialTheme.typography.titleMedium)
+        PanelHeader(Icons.Default.BatteryFull, stringResource(R.string.battery_title))
         Spacer(Modifier.height(6.dp))
         Text(stringResource(R.string.battery_body), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(12.dp))
-        OutlinedButton(onClick = { openBatterySettings(ctx) }) { Text(stringResource(R.string.open_settings)) }
+        LeafOutlinedButton(onClick = { openBatterySettings(ctx) }) { Text(stringResource(R.string.open_settings)) }
     }
 }
 
@@ -243,12 +272,12 @@ fun SoundsPanel() {
         }
     }
     Panel(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.notif_sound_title), style = MaterialTheme.typography.titleMedium)
+        PanelHeader(Icons.Default.VolumeUp, stringResource(R.string.notif_sound_title))
         Spacer(Modifier.height(8.dp))
-        RingtoneRow(stringResource(R.string.ringtone_alerts), alertSoundName) {
+        RingtoneRow(stringResource(R.string.ringtone_alerts), alertSoundName, icon = Icons.Default.NotificationsActive) {
             alertSoundPicker.launch(Notifier.ringtonePickerIntent(ctx, alertSound, ctx.getString(R.string.ringtone_pick_title)))
         }
-        RingtoneRow(stringResource(R.string.ringtone_general), generalSoundName) {
+        RingtoneRow(stringResource(R.string.ringtone_general), generalSoundName, icon = Icons.Default.Notifications) {
             generalSoundPicker.launch(Notifier.ringtonePickerIntent(ctx, generalSound, ctx.getString(R.string.ringtone_pick_title)))
         }
         // Issue #6: the Remote phone never asked for POST_NOTIFICATIONS (only the
@@ -258,7 +287,7 @@ fun SoundsPanel() {
             Spacer(Modifier.height(8.dp))
             Text(stringResource(R.string.notif_perm_needed), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = {
+            LeafOutlinedButton(onClick = {
                 Perms.notificationsPermission()?.let { notifPerm.launch(it) } ?: run { notifOk = true }
             }) { Text(stringResource(R.string.grant)) }
         }
@@ -279,7 +308,7 @@ fun RolePanel(vm: AppViewModel) {
     var resetWrong by remember { mutableStateOf(false) }
     var resetBusy by remember { mutableStateOf(false) }
     Panel(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.set_role), style = MaterialTheme.typography.titleMedium)
+        PanelHeader(Icons.Default.Person, stringResource(R.string.set_role))
         Spacer(Modifier.height(4.dp))
         Text(
             stringResource(
@@ -292,11 +321,11 @@ fun RolePanel(vm: AppViewModel) {
             color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
         )
         Spacer(Modifier.height(12.dp))
-        OutlinedButton(onClick = { pinInput = ""; pinWrong = false; showPinDialog = true }) {
+        LeafOutlinedButton(onClick = { pinInput = ""; pinWrong = false; showPinDialog = true }) {
             Text(stringResource(R.string.role_change))
         }
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = { resetPassword = ""; resetWrong = false; showResetDialog = true }) {
+        LeafTextButton(onClick = { resetPassword = ""; resetWrong = false; showResetDialog = true }) {
             Text(stringResource(R.string.pin_forgot))
         }
     }
@@ -320,13 +349,13 @@ fun RolePanel(vm: AppViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
+                LeafTextButton(onClick = {
                     if (vm.clearRoleAfterPin(pinInput)) showPinDialog = false
                     else pinWrong = true
                 }) { Text(stringResource(R.string.continue_label)) }
             },
             dismissButton = {
-                TextButton(onClick = { showPinDialog = false }) { Text(stringResource(R.string.close)) }
+                LeafTextButton(onClick = { showPinDialog = false }) { Text(stringResource(R.string.close)) }
             },
         )
     }
@@ -354,7 +383,7 @@ fun RolePanel(vm: AppViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(
+                LeafTextButton(
                     enabled = !resetBusy && resetPassword.isNotBlank(),
                     onClick = {
                         resetBusy = true
@@ -366,7 +395,7 @@ fun RolePanel(vm: AppViewModel) {
                 ) { Text(stringResource(R.string.pin_reset)) }
             },
             dismissButton = {
-                TextButton(enabled = !resetBusy, onClick = { showResetDialog = false }) { Text(stringResource(R.string.cancel)) }
+                LeafTextButton(enabled = !resetBusy, onClick = { showResetDialog = false }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -379,14 +408,14 @@ fun UpdatePanel(vm: AppViewModel) {
     var checking by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<Int?>(null) }
     Panel(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.update_title), style = MaterialTheme.typography.titleMedium)
+        PanelHeader(Icons.Default.Update, stringResource(R.string.update_title))
         Spacer(Modifier.height(4.dp))
         Text(
             stringResource(R.string.version, BuildConfig.VERSION_NAME),
             color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
         )
         Spacer(Modifier.height(12.dp))
-        OutlinedButton(
+        LeafOutlinedButton(
             onClick = {
                 checking = true; result = null
                 vm.checkForUpdate { r ->
@@ -414,13 +443,22 @@ fun UpdatePanel(vm: AppViewModel) {
 @Composable
 fun AccountPanel(vm: AppViewModel) {
     Panel(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.set_account), style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(4.dp))
-        Text(vm.email, color = Palette.Muted)
+        PanelHeader(Icons.Default.AccountCircle, stringResource(R.string.set_account))
         Spacer(Modifier.height(12.dp))
-        Text(stringResource(R.string.set_device), style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(4.dp))
-        Text(vm.deviceId.take(8), color = Palette.Muted)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AccentCircle(Icons.Default.Email)
+            Spacer(Modifier.width(12.dp))
+            Text(vm.email, color = Palette.Muted, modifier = Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AccentCircle(Icons.Default.Smartphone)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.set_device), style = MaterialTheme.typography.titleMedium)
+                Text(vm.deviceId.take(8), color = Palette.Muted)
+            }
+        }
         Spacer(Modifier.height(16.dp))
         OutlinedButton(
             onClick = vm::signOut,

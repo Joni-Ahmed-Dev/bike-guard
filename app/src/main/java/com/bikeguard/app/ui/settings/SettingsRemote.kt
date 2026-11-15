@@ -3,17 +3,26 @@ package com.bikeguard.app.ui.settings
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CarCrash
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Message
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -24,7 +33,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
@@ -50,42 +58,40 @@ import com.bikeguard.app.ui.theme.Panel
 @Composable
 fun SyncStatusPanel(vm: AppViewModel, now: Long) {
     val ctx = LocalContext.current
+    val watched = vm.watchedDevice
     Panel(Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                val watched = vm.watchedDevice
-                Text(
-                    stringResource(R.string.settings_target, watched?.name ?: vm.settingsTargetId.take(8)),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Spacer(Modifier.height(2.dp))
-                // Which device row is being watched: model + short id + last seen,
-                // so a re-registered tracker is visible here instead of a
-                // silent stale target.
-                watched?.let { d ->
-                    val seenMs = d.lastSeen?.let { isoToMs(it) } ?: 0L
-                    Text(
-                        (d.id?.take(8) ?: "") +
-                            if (seenMs > 0) " · " + stringResource(R.string.stat_updated) + " " + agoText(ctx, seenMs, now) else "",
-                        color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                }
-                Text(
-                    when (vm.settingsApplied) {
-                        true -> stringResource(R.string.sync_applied)
-                        false -> stringResource(R.string.sync_pending)
-                        null -> stringResource(R.string.none)
-                    },
-                    color = if (vm.settingsApplied == true) Palette.Signal else Palette.Muted,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                vm.settingsNote?.let {
-                    Text(it, color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            OutlinedButton(onClick = vm::loadRemoteSettings) { Text(stringResource(R.string.sync_refresh)) }
+        PanelHeader(
+            Icons.Default.Sync,
+            stringResource(R.string.settings_target, watched?.name ?: vm.settingsTargetId.take(8)),
+        )
+        Spacer(Modifier.height(12.dp))
+        // Which device row is being watched: model + short id + last seen,
+        // so a re-registered tracker is visible here instead of a
+        // silent stale target.
+        watched?.let { d ->
+            val seenMs = d.lastSeen?.let { isoToMs(it) } ?: 0L
+            Text(
+                (d.id?.take(8) ?: "") +
+                    if (seenMs > 0) " · " + stringResource(R.string.stat_updated) + " " + agoText(ctx, seenMs, now) else "",
+                color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(Modifier.height(2.dp))
+        }
+        Text(
+            when (vm.settingsApplied) {
+                true -> stringResource(R.string.sync_applied)
+                false -> stringResource(R.string.sync_pending)
+                null -> stringResource(R.string.none)
+            },
+            color = if (vm.settingsApplied == true) Palette.Signal else Palette.Muted,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        vm.settingsNote?.let {
+            Text(it, color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
+        }
+        Spacer(Modifier.height(12.dp))
+        LeafOutlinedButton(onClick = vm::loadRemoteSettings, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.sync_refresh))
         }
     }
 }
@@ -105,7 +111,7 @@ fun ModePanel(vm: AppViewModel) {
         else { autoDenied = false; vm.updateMode(m) }
     }
     Panel(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.set_mode), style = MaterialTheme.typography.titleMedium)
+        PanelHeader(Icons.Default.Tune, stringResource(R.string.set_mode))
         Spacer(Modifier.height(12.dp))
         val modes = listOf(MODE_MANUAL to R.string.mode_manual, MODE_AUTO to R.string.mode_auto, MODE_ALWAYS to R.string.mode_always)
         // 48dp rows (v1.2.20): the Material3 default segmented row is 40dp.
@@ -131,7 +137,7 @@ fun ModePanel(vm: AppViewModel) {
 fun IntervalPanel(vm: AppViewModel) {
     val segColors = rememberSegColors()
     Panel(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.set_interval), style = MaterialTheme.typography.titleMedium)
+        PanelHeader(Icons.Default.Timer, stringResource(R.string.set_interval))
         Spacer(Modifier.height(12.dp))
         val options = listOf(5, 7, 10)
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().height(48.dp)) {
@@ -154,10 +160,11 @@ fun GuardPanel(vm: AppViewModel) {
     var autoArm by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.autoArm ?: prefs.autoArm) }
     var siren by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.sirenOnAlert ?: prefs.sirenOnAlert) }
     Panel(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.set_guard), style = MaterialTheme.typography.titleMedium)
+        PanelHeader(Icons.Default.Lock, stringResource(R.string.set_guard))
         Spacer(Modifier.height(8.dp))
-        SwitchRow(stringResource(R.string.guard_auto), null, autoArm) { autoArm = it; prefs.autoArm = it; vm.pushSettingsPatch(autoArm = it) }
-        SwitchRow(stringResource(R.string.guard_siren), null, siren) { siren = it; prefs.sirenOnAlert = it; vm.pushSettingsPatch(sirenOnAlert = it) }
+        SwitchRow(stringResource(R.string.guard_auto), null, autoArm, icon = Icons.Default.Shield) { autoArm = it; prefs.autoArm = it; vm.pushSettingsPatch(autoArm = it) }
+        SettingsDivider()
+        SwitchRow(stringResource(R.string.guard_siren), null, siren, icon = Icons.Default.NotificationsActive) { siren = it; prefs.sirenOnAlert = it; vm.pushSettingsPatch(sirenOnAlert = it) }
     }
 }
 
@@ -180,10 +187,11 @@ fun SafetyPanel(vm: AppViewModel) {
         if (ok) { sms = true; prefs.sosSms = true; vm.pushSettingsPatch(sosSms = true) }
     }
     Panel(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.set_safety), style = MaterialTheme.typography.titleMedium)
+        PanelHeader(Icons.Default.Security, stringResource(R.string.set_safety))
         Spacer(Modifier.height(8.dp))
-        SwitchRow(stringResource(R.string.safety_crash), null, crash) { crash = it; prefs.crashDetection = it; vm.pushSettingsPatch(crashEnabled = it) }
-        SwitchRow(stringResource(R.string.safety_sms), stringResource(R.string.safety_sms_hint), sms) { on ->
+        SwitchRow(stringResource(R.string.safety_crash), null, crash, icon = Icons.Default.CarCrash) { crash = it; prefs.crashDetection = it; vm.pushSettingsPatch(crashEnabled = it) }
+        SettingsDivider()
+        SwitchRow(stringResource(R.string.safety_sms), stringResource(R.string.safety_sms_hint), sms, icon = Icons.Default.Message) { on ->
             // Only the OFF branch pushes here: turning ON pushes from the
             // permission callback once granted, so the server never briefly
             // sees the still-false local value (v1.2.17).
@@ -201,7 +209,7 @@ fun SafetyPanel(vm: AppViewModel) {
             !smsPermOk -> {
                 Text(stringResource(R.string.sms_perm_needed), color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(6.dp))
-                OutlinedButton(onClick = { smsPerm.launch(Manifest.permission.SEND_SMS) }) { Text(stringResource(R.string.grant)) }
+                LeafOutlinedButton(onClick = { smsPerm.launch(Manifest.permission.SEND_SMS) }) { Text(stringResource(R.string.grant)) }
             }
             else -> Text(stringResource(R.string.safety_sms_on, number.trim()), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
         }
@@ -209,10 +217,17 @@ fun SafetyPanel(vm: AppViewModel) {
             value = number, onValueChange = { number = it; prefs.emergencyNumber = it.trim() }, singleLine = true,
             label = { Text(stringResource(R.string.safety_number)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Palette.Card, unfocusedContainerColor = Palette.Card,
+                focusedBorderColor = Palette.Leaf, unfocusedBorderColor = Palette.Stroke,
+                cursorColor = Palette.Text,
+            ),
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 .onFocusChanged { if (!it.isFocused) vm.pushSettingsPatch(sosNumber = prefs.emergencyNumber) },
         )
         Spacer(Modifier.height(14.dp))
+        SettingsDivider()
         Text(stringResource(R.string.limit_title), style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         ChipRow(
@@ -229,7 +244,7 @@ fun ServicePanel(vm: AppViewModel) {
     val prefs = ctx.bikeApp.prefs
     var serviceEvery by remember(vm.remoteSettings) { mutableIntStateOf(vm.remoteSettings?.serviceKm ?: prefs.serviceIntervalKm) }
     Panel(Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.set_service), style = MaterialTheme.typography.titleMedium)
+        PanelHeader(Icons.Default.Build, stringResource(R.string.set_service))
         Spacer(Modifier.height(8.dp))
         ChipRow(
             listOf(0, 1000, 2000, 3000, 5000), serviceEvery,
@@ -240,7 +255,7 @@ fun ServicePanel(vm: AppViewModel) {
         }
         if (serviceEvery > 0) {
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = {
+            LeafOutlinedButton(onClick = {
                 // On the Remote phone this must reach the bike as a command; only changing
                 // this phone's prefs would silently do nothing.
                 vm.sendRemoteCommand("mark_serviced")
