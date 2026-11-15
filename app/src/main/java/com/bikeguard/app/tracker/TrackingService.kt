@@ -492,7 +492,16 @@ class TrackingService : Service() {
         if (s.sosSms != p.sosSms) p.sosSms = s.sosSms
         if (s.crashEnabled != p.crashDetection) p.crashDetection = s.crashEnabled
         if (s.sosNumber != p.emergencyNumber) p.emergencyNumber = s.sosNumber
-        if (s.serviceKm != p.serviceIntervalKm) p.scheduleService(s.serviceKm)
+        if (s.serviceKm != p.serviceIntervalKm) {
+            // A fresh install has interval 0: restore the server value directly.
+            // scheduleService() would recompute nextServiceKm from the current
+            // odometer and overwrite the correctly adopted server value (v1.2.16),
+            // and the stateDirty patch would then push the wrong value back to
+            // the server. A genuine Remote interval change (local non-zero) keeps
+            // the old behaviour: recompute the next due from now.
+            if (p.serviceIntervalKm == 0) { p.serviceIntervalKm = s.serviceKm; p.serviceIntervalAdopted = true }
+            else p.scheduleService(s.serviceKm)
+        }
         p.guardScheduleStart = s.guardScheduleStart ?: -1
         p.guardScheduleEnd = s.guardScheduleEnd ?: -1
     }

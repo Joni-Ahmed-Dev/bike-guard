@@ -72,6 +72,8 @@ class Prefs(private val context: Context) {
         deviceRegistered = false
         // A new row means the odometer adopt must run again for that row.
         odometerAdopted = false
+        // Same for the service interval adopt (v1.2.16).
+        serviceIntervalAdopted = false
     }
     /** True once this phone's hardware key has been stamped on its server device row
      *  (devices.hardware_key, migration 0008). False until the stamp succeeds, so a
@@ -147,7 +149,15 @@ class Prefs(private val context: Context) {
         dueNotified = false
         stateDirty = true
     }
-    fun markServiced() = scheduleService(serviceIntervalKm)
+    /** Marks the bike serviced: next due = odometer + interval. Refuses while the
+     *  interval is still unknown (fresh install, server value not adopted yet):
+     *  computing from interval 0 would switch the reminder off, and the zero
+     *  must never be treated as a real value. Once adopted, an interval of 0
+     *  genuinely means "reminder off" and is honoured. */
+    fun markServiced() {
+        if (serviceIntervalKm == 0 && !serviceIntervalAdopted) return
+        scheduleService(serviceIntervalKm)
+    }
 
     /** True once this phone has pulled the server's odometer / next-service values
      *  into Prefs (v1.2.11). A reinstall wipes Prefs (odometer 0, stateDirty true by
@@ -158,6 +168,14 @@ class Prefs(private val context: Context) {
     var odometerAdopted: Boolean
         get() = sp.getBoolean("odo_adopted", false)
         set(v) = sp.edit { putBoolean("odo_adopted", v) }
+
+    /** True once this phone has pulled the server's service interval
+     *  (device_settings.service_km) into Prefs (v1.2.16). A reinstall wipes
+     *  serviceIntervalKm to 0; until the adopt runs, 0 means "unknown", not
+     *  "reminder off" — markServiced() must not compute from it. */
+    var serviceIntervalAdopted: Boolean
+        get() = sp.getBoolean("svc_interval_adopted", false)
+        set(v) = sp.edit { putBoolean("svc_interval_adopted", v) }
 
     /** True when the device row on the server is out of date and should be patched on the next sync. */
     var stateDirty: Boolean

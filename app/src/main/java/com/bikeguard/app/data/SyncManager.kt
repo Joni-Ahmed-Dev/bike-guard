@@ -207,6 +207,24 @@ class SyncManager(
                     // offline: adopt on the next flush; the patch below omits odometer
                 }
             }
+            // Adopt the server's service interval once per install, next to the
+            // odometer adopt (v1.2.16). A reinstall wipes serviceIntervalKm to 0,
+            // and a mark_serviced before the first settings sync would otherwise
+            // compute from interval 0. Set the interval directly — never recompute
+            // nextServiceKm here; the adopted server value is the anchor. The
+            // Tracker never writes service_km back (Remote-owned), so this sets
+            // no stateDirty.
+            if (!prefs.serviceIntervalAdopted) {
+                try {
+                    val s = api.getDeviceSettings(prefs.deviceId)
+                    if (s != null) {
+                        prefs.serviceIntervalKm = s.serviceKm
+                        prefs.serviceIntervalAdopted = true
+                    }
+                } catch (e: IOException) {
+                    // offline: adopt on the next flush
+                }
+            }
             val ownerId = prefs.userId
             var ok = true
             var error: String? = null
