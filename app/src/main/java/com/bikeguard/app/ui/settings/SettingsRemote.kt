@@ -162,9 +162,9 @@ fun GuardPanel(vm: AppViewModel) {
     Panel(Modifier.fillMaxWidth()) {
         PanelHeader(Icons.Default.Lock, stringResource(R.string.set_guard))
         Spacer(Modifier.height(8.dp))
-        SwitchRow(stringResource(R.string.guard_auto), null, autoArm, icon = Icons.Default.Shield) { autoArm = it; prefs.autoArm = it; vm.pushSettingsPatch(autoArm = it) }
+        SwitchRow(stringResource(R.string.guard_auto), null, autoArm, onChange = { autoArm = it; prefs.autoArm = it; vm.pushSettingsPatch(autoArm = it) }, icon = Icons.Default.Shield)
         SettingsDivider()
-        SwitchRow(stringResource(R.string.guard_siren), null, siren, icon = Icons.Default.NotificationsActive) { siren = it; prefs.sirenOnAlert = it; vm.pushSettingsPatch(sirenOnAlert = it) }
+        SwitchRow(stringResource(R.string.guard_siren), null, siren, onChange = { siren = it; prefs.sirenOnAlert = it; vm.pushSettingsPatch(sirenOnAlert = it) }, icon = Icons.Default.NotificationsActive)
     }
 }
 
@@ -189,15 +189,15 @@ fun SafetyPanel(vm: AppViewModel) {
     Panel(Modifier.fillMaxWidth()) {
         PanelHeader(Icons.Default.Security, stringResource(R.string.set_safety))
         Spacer(Modifier.height(8.dp))
-        SwitchRow(stringResource(R.string.safety_crash), null, crash, icon = Icons.Default.CarCrash) { crash = it; prefs.crashDetection = it; vm.pushSettingsPatch(crashEnabled = it) }
+        SwitchRow(stringResource(R.string.safety_crash), null, crash, onChange = { crash = it; prefs.crashDetection = it; vm.pushSettingsPatch(crashEnabled = it) }, icon = Icons.Default.CarCrash)
         SettingsDivider()
-        SwitchRow(stringResource(R.string.safety_sms), stringResource(R.string.safety_sms_hint), sms, icon = Icons.Default.Message) { on ->
+        SwitchRow(stringResource(R.string.safety_sms), stringResource(R.string.safety_sms_hint), sms, onChange = { on ->
             // Only the OFF branch pushes here: turning ON pushes from the
             // permission callback once granted, so the server never briefly
             // sees the still-false local value (v1.2.17).
             if (!on) { sms = false; prefs.sosSms = false; vm.pushSettingsPatch(sosSms = false) }
             else smsPerm.launch(Manifest.permission.SEND_SMS)
-        }
+        }, icon = Icons.Default.Message)
         // What actually happens (v1.2.19): sosSms defaults to false, so
         // crash detection alone used to look like it sends an SMS when it
         // does not. Say it plainly for every state, and offer the

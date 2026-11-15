@@ -121,10 +121,10 @@ fun LockPanel() {
     var lock by remember { mutableStateOf(prefs.appLock) }
     var lockMsg by remember { mutableStateOf(false) }
     Panel(Modifier.fillMaxWidth()) {
-        SwitchRow(stringResource(R.string.set_lock), stringResource(R.string.lock_desc), lock, icon = Icons.Default.Lock) { on ->
+        SwitchRow(stringResource(R.string.set_lock), stringResource(R.string.lock_desc), lock, onChange = { on ->
             val ok = BiometricManager.from(ctx).canAuthenticate(BIOMETRIC_WEAK or DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS
             if (on && !ok) lockMsg = true else { lockMsg = false; lock = on; prefs.appLock = on }
-        }
+        }, icon = Icons.Default.Lock)
         if (lockMsg) Text(stringResource(R.string.lock_unavailable), color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
     }
 }
@@ -198,14 +198,14 @@ fun LocalViewerPanel() {
     var showRoute by remember { mutableStateOf(prefs.showRouteLine) }
     var dlResult by remember { mutableStateOf<Int?>(null) }
     Panel(Modifier.fillMaxWidth()) {
-        SwitchRow(stringResource(R.string.lowdata_title), stringResource(R.string.lowdata_desc), lowData, icon = Icons.Default.DataUsage) {
+        SwitchRow(stringResource(R.string.lowdata_title), stringResource(R.string.lowdata_desc), lowData, onChange = {
             lowData = it; prefs.lowDataMode = it
-        }
+        }, icon = Icons.Default.DataUsage)
     }
     Panel(Modifier.fillMaxWidth()) {
-        SwitchRow(stringResource(R.string.route_line_title), stringResource(R.string.route_line_desc), showRoute, icon = Icons.Default.AltRoute) {
+        SwitchRow(stringResource(R.string.route_line_title), stringResource(R.string.route_line_desc), showRoute, onChange = {
             showRoute = it; prefs.showRouteLine = it
-        }
+        }, icon = Icons.Default.AltRoute)
     }
     Panel(Modifier.fillMaxWidth()) {
         PanelHeader(Icons.Default.Download, stringResource(R.string.offline_dl_title))
