@@ -6,11 +6,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.IOException
+import java.util.UUID
 
 /** Uploads the offline queue in batches. Safe to call from anywhere, any number of times. */
 class SyncManager(
     private val dao: PendingDao,
     private val events: EventDao,
+    private val expenses: ExpenseDao,
     private val api: SupabaseApi,
     private val prefs: Prefs,
     private val diag: DiagReporter? = null,
@@ -70,6 +72,52 @@ class SyncManager(
             scope?.launch { diag?.report("sync recovered") }
         }
         outcome.ok
+    }
+
+    /** Syncs the expense log with the server (v1.2.15). Uploads unsynced local rows
+     *  (each keyed by its client UUID, so a retry never duplicates), then downloads
+     *  any server rows missing locally — so the log comes back after a reinstall or
+     *  a destructive Room migration. Separate from flush(): expenses belong to the
+     *  Remote phone, which never runs the location flush, so the Expenses screen
+     *  calls this directly. Safe to call from either role: the rows are
+     *  owner-scoped. Returns false offline or when the server refuses; a 400/422
+     *  keeps the rows unsynced instead of dropping a user's expense. */
+    suspend fun syncExpenses(): Boolean {
+        if (!prefs.isLoggedIn) return false
+        return try {
+            val pending = expenses.unsynced()
+            if (pending.isNotEmpty()) {
+                // Give every unsynced row its client UUID first, then upload in
+                // one idempotent batch; only mark synced on success.
+                val ready = pending.map { row ->
+                    if (row.serverId.isBlank()) {
+                        val id = UUID.randomUUID().toString()
+                        expenses.setServerId(row.id, id)
+                        row.copy(serverId = id)
+                    } else row
+                }
+                val up = api.uploadExpenses(ready.map { it.toDto() })
+                if (up.result != UploadResult.OK) return false
+                expenses.markSynced(ready.map { it.id })
+            }
+            // Download: any server row missing locally is restored (fresh install,
+            // or a local wipe). Local rows are never overwritten or deleted here.
+            val remote = api.listExpenses() ?: return false
+            for (dto in remote) {
+                if (expenses.byServerId(dto.id) == null) {
+                    expenses.insert(
+                        ExpenseRecord(
+                            category = dto.category, amount = dto.amount, note = dto.note.orEmpty(),
+                            spentOn = expenseDateToMs(dto.spentOn), serverId = dto.id, synced = true,
+                            createdAt = dto.createdAt?.let { isoToMs(it) } ?: System.currentTimeMillis(),
+                        )
+                    )
+                }
+            }
+            true
+        } catch (e: IOException) {
+            false
+        }
     }
 
     /**

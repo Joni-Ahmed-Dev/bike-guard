@@ -40,7 +40,7 @@ class BikeGuardApp : Application() {
         api = SupabaseApi(prefs)
         db = AppDatabase.get(this)
         diag = DiagReporter(this, prefs, db.pending())
-        sync = SyncManager(db.pending(), db.events(), api, prefs, diag, appScope)
+        sync = SyncManager(db.pending(), db.events(), db.expenses(), api, prefs, diag, appScope)
         realtime = RealtimeClient(api)
         // Session expiry (v1.2.12): the refresh token can be rejected while the app sits
         // in the background, and clearSession() then stops tracking and disarms the guard
@@ -56,7 +56,7 @@ class BikeGuardApp : Application() {
         // re-post just updates the notification already showing.
         if (prefs.sessionExpiredPending && prefs.isTracker) Notifier.sessionExpired(this)
         // Report the app's state to the diagnostics Worker on every start,
-        // so Muse can see the tracker even when Supabase sync is failing.
+        // so the owner can see the tracker even when Supabase sync is failing.
         appScope.launch { diag.report("app start") }
         TrackerState.armed.value = prefs.parkingArmed
         createChannels()

@@ -18,7 +18,7 @@ class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         val app = applicationContext.bikeApp
         app.sync.flush()
-        // Heartbeat to the diagnostics Worker, so Muse can see the tracker
+        // Heartbeat to the diagnostics Worker, so the owner can see the tracker
         // is alive even when Supabase sync is failing.
         app.diag.report("heartbeat")
         // Remote alerts without FCM: (re)start the app-level Realtime listener

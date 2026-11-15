@@ -207,3 +207,16 @@ data class ParkingSpotDto(
 ) {
     val createdMs: Long get() = isoToMs(createdAt.orEmpty())
 }
+
+/** One expense row on the server (v1.2.15). The client UUID is the row's id, so
+ *  uploads are idempotent. owner_id / device_id are never sent: the server
+ *  default fills owner_id from the JWT, and device_id is nullable. */
+@Serializable
+data class ExpenseDto(
+    val id: String,
+    val category: String,
+    val amount: Double,
+    val note: String? = null,
+    @SerialName("spent_on") val spentOn: String,
+    @SerialName("created_at") val createdAt: String? = null,
+)

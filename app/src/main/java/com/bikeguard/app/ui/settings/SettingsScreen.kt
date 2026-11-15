@@ -151,7 +151,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     ) {
         Text(stringResource(R.string.tab_settings), style = MaterialTheme.typography.headlineMedium)
 
-        // ---- diagnostics: what is happening inside the app, and a report to Muse ----
+        // ---- diagnostics: what is happening inside the app, and a report to the diagnostics dashboard ----
         Panel(Modifier.fillMaxWidth()) {
             OutlinedButton(
                 onClick = { showDiagnostics = true },

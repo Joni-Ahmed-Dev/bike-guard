@@ -15,7 +15,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
 /** Reports what is happening inside the app to the bikeguard-diag Worker,
- * so Muse can see the tracker's state without asking for screenshots.
+ * so the owner can see the tracker's state without asking for screenshots.
  * No location is ever sent: only role, tracking state, queued count, last
  * fix age, last sync error, battery and app version.
  * Best-effort only: never throws, never blocks the caller.

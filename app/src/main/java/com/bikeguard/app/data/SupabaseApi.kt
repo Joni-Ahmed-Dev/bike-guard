@@ -63,7 +63,7 @@ class SupabaseApi(private val prefs: Prefs) {
             val body = resp.body?.string().orEmpty()
             // Keep the server's own message: it says exactly why a 403
             // happened (which policy, bad JWT, missing table), and the
-            // diagnostics screen and Worker report carry it to Muse.
+            // diagnostics screen and Worker report carry it to the owner.
             val err = if (resp.code in 200..299) null else "server ${resp.code}" +
                 errorText(body).takeIf { it.isNotBlank() && it != "Request failed" }
                     ?.let { ": ${it.take(120).replace('\n', ' ').replace('\r', ' ')}" }.orEmpty()
@@ -376,6 +376,39 @@ class SupabaseApi(private val prefs: Prefs) {
                 .header("Prefer", "return=minimal").patch(body.toRequestBody(jsonType)).build()
         }.ok
     }
+
+    // ---------- expenses (v1.2.15: the log syncs to the server so it survives an upgrade) ----------
+
+    /** Uploads expense rows, keyed by the client UUID in [ExpenseDto.id]. Idempotent:
+     *  on_conflict=id with ignore-duplicates, so a retry never creates a second row.
+     *  A 400/422 (bad category or amount) can never succeed: the caller keeps those
+     *  rows unsynced and reports the error instead of dropping a user's expense.
+     *  A 409/403 is a plain retry here — it never touches deviceRegistered, which
+     *  is about the tracker device row, not expenses. */
+    suspend fun uploadExpenses(items: List<ExpenseDto>): UploadOutcome = try {
+        val payload = json.encodeToString(ListSerializer(ExpenseDto.serializer()), items)
+        val r = authed {
+            builder("/rest/v1/expenses?on_conflict=id", it)
+                .header("Prefer", "resolution=ignore-duplicates,return=minimal")
+                .post(payload.toRequestBody(jsonType)).build()
+        }
+        when {
+            r.ok -> UploadOutcome(UploadResult.OK)
+            r.code == 400 || r.code == 422 -> UploadOutcome(UploadResult.REJECTED, r.error)
+            else -> UploadOutcome(UploadResult.RETRY, r.error)
+        }
+    } catch (e: IOException) { UploadOutcome(UploadResult.RETRY, ioReason(e)) }
+
+    /** All of the owner's expense rows, newest first. Throws IOException when offline; null on an HTTP error. */
+    suspend fun listExpenses(): List<ExpenseDto>? {
+        val r = authed { builder("/rest/v1/expenses?select=id,category,amount,note,spent_on,created_at&order=spent_on.desc&limit=500", it).get().build() }
+        return if (r.ok) runCatching { json.decodeFromString(ListSerializer(ExpenseDto.serializer()), r.body) }.getOrNull() else null
+    }
+
+    /** Deletes one server row by its client UUID. False when offline or refused. */
+    suspend fun deleteExpense(serverId: String): Boolean = try {
+        authed { builder("/rest/v1/expenses?id=eq.$serverId", it).delete().build() }.ok
+    } catch (e: IOException) { false }
 
     // ---------- v1.1.0: server-synced settings, parking spots ----------
 

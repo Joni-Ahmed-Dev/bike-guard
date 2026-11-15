@@ -43,7 +43,7 @@ import com.bikeguard.app.ui.theme.Panel
 import kotlinx.coroutines.launch
 
 /** Shows what is happening inside the app, and lets the user send a report
- * to the diagnostics Worker so Muse can see the same state. */
+ * to the diagnostics Worker so the owner can see the same state. */
 @Composable
 fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
