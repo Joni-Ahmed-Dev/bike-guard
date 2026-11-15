@@ -1,0 +1,45 @@
+# Supabase keep-alive workflow — v1.2.21, review item #23.
+#
+# WHY THIS EXISTS: free-plan projects pause after 7 days of low activity,
+# and pg_cron lives INSIDE the database, so it cannot wake a paused project
+# back up — once paused, the stale-device cron, the retention job and the
+# tracker API all stop together. The tracker phone's own traffic counts as
+# activity while the bike is in use, but a week with the bike parked (or
+# the owner abroad) is enough to pause it. This workflow pings the project
+# from OUTSIDE every 6 hours with a real database query, which counts as
+# activity and keeps the 7-day clock from ever running out.
+#
+# HOW TO ADD IT: the GitHub App cannot write .github/workflows/* (403).
+# Copy this file to .github/workflows/supabase-keep-alive.yml in the
+# signed-in browser (Add file -> Create new file), commit to main.
+# It needs the SUPABASE_URL / SUPABASE_ANON_KEY secrets the Android CI
+# job already uses — no new secret needed.
+#
+# WHAT IT DOES NOT DO: it only prevents the pause. It does not back
+# anything up (see docs/backup.md), and if the project is already paused
+# the job fails loudly every 6 hours until someone resumes it from the
+# Supabase dashboard. The only guaranteed fix is the Pro plan ($25/mo),
+# which never pauses — that is the owner's decision, not a code change.
+
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase (real query, counts as activity)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            "$SUPABASE_URL/rest/v1/devices?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+          echo "Supabase answered HTTP $code"
+          test "$code" = "200"

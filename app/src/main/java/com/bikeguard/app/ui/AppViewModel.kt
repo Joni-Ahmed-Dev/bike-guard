@@ -14,6 +14,9 @@ import com.bikeguard.app.data.DeviceSettingsDto
 import com.bikeguard.app.data.MODE_ALWAYS
 import com.bikeguard.app.data.MODE_AUTO
 import com.bikeguard.app.data.ROLE_REMOTE
+import com.bikeguard.app.data.UpdateCheckResult
+import com.bikeguard.app.data.UpdateChecker
+import com.bikeguard.app.data.UpdateInfo
 import com.bikeguard.app.data.isoToMs
 import com.bikeguard.app.data.pickActiveDevice
 import com.bikeguard.app.tracker.AutoMode
@@ -52,11 +55,32 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val email get() = app.prefs.email.orEmpty()
     val deviceId get() = app.prefs.deviceId
 
+    /** Newer GitHub Release, when the update check found one. */
+    var updateAvailable by mutableStateOf<UpdateInfo?>(null); private set
+
     init {
         viewModelScope.launch {
             app.api.sessionExpired.collect { expired -> if (expired) endSession(flushFirst = false) }
         }
+        // Update check once per app start (v1.2.21): Releases are the
+        // distribution channel now; the check is a public API call, needs
+        // no login, and fails silently offline.
+        viewModelScope.launch {
+            val result = UpdateChecker.checkLatest()
+            if (result is UpdateCheckResult.Available) updateAvailable = result.info
+        }
     }
+
+    /** Manual re-check from Settings; the callback gets the full outcome. */
+    fun checkForUpdate(onResult: (UpdateCheckResult) -> Unit) {
+        viewModelScope.launch {
+            val result = UpdateChecker.checkLatest()
+            if (result is UpdateCheckResult.Available) updateAvailable = result.info
+            onResult(result)
+        }
+    }
+
+    fun dismissUpdate() { updateAvailable = null }
 
     fun submit(email: String, password: String, signUp: Boolean) {
         if (busy) return

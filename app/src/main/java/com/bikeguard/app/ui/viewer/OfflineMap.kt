@@ -26,6 +26,15 @@ object OfflineMap {
                 .build()
             val definition = OfflineTilePyramidRegionDefinition(MAP_STYLE, bounds, 10.0, 16.0, density)
             val mgr = OfflineManager.getInstance(ctx)
+            // OpenFreeMap Terms of Service (verified 15 Nov 2026): an offline
+            // download may be at most 3,000 tiles or 50 MB, with at most 4
+            // parallel requests and a unique User-Agent naming the app.
+            // This ~20 km box at zoom 10-16 is roughly 1,400 tiles, but the
+            // SDK default cap is 6,000 — so cap it at the ToS limit here.
+            // Two gaps remain (follow-up, not enforced by this call): the
+            // 50 MB size cap (retina tiles are bigger; size is not tracked)
+            // and the app-identifying User-Agent (MapLibre sends its own).
+            mgr.setOfflineMapboxTileCountLimit(3_000)
             // Reuse the existing region instead of creating a duplicate on every tap.
             mgr.listOfflineRegions(object : OfflineManager.ListOfflineRegionsCallback {
                 override fun onList(regions: Array<OfflineRegion>?) {

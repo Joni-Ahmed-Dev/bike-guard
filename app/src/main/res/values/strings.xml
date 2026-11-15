@@ -368,4 +368,13 @@
     <string name="pin_reset_hint">Enter your account password. The role PIN is cleared and you pick a new role and PIN.</string>
     <string name="pin_reset_wrong">Wrong password</string>
     <string name="pin_reset">Reset PIN</string>
+    <string name="update_title">App updates</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_checking">Checking…</string>
+    <string name="update_latest">You are on the latest version.</string>
+    <string name="update_failed">Could not check for updates. Check your connection and try again.</string>
+    <string name="update_available_title">Version %1$s is available</string>
+    <string name="update_available_body">A newer BikeGuard release is available on GitHub. Download the APK from the release page and install it over this version.</string>
+    <string name="update_download">Download</string>
+    <string name="update_later">Later</string>
 </resources>

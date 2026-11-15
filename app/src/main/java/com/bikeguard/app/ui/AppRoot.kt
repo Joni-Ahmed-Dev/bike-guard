@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -19,6 +20,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -108,6 +110,25 @@ private fun HomeScreen(vm: AppViewModel, alerts: AlertsViewModel = viewModel()) 
         owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) { alerts.refresh(); delay(30_000) }
         }
+    }
+    // Newer GitHub Release found by the startup update check (v1.2.21):
+    // one dismissible prompt, shown over any tab.
+    val update = vm.updateAvailable
+    if (update != null) {
+        AlertDialog(
+            onDismissRequest = vm::dismissUpdate,
+            containerColor = Palette.Surface,
+            title = { Text(stringResource(R.string.update_available_title, update.version)) },
+            text = { Text(stringResource(R.string.update_available_body)) },
+            confirmButton = {
+                TextButton(onClick = { openWebPage(ctx, update.url); vm.dismissUpdate() }) {
+                    Text(stringResource(R.string.update_download))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = vm::dismissUpdate) { Text(stringResource(R.string.update_later)) }
+            },
+        )
     }
     Scaffold(
         containerColor = Palette.Ink,

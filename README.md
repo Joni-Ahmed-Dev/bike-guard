@@ -1,8 +1,14 @@
-# 🏍️ BikeGuard (v1.2.15 — দুই ভূমিকা ও সার্ভার-সিঙ্ক সেটিংস)
+# 🏍️ BikeGuard (v1.2.21 — দুই ভূমিকা ও সার্ভার-সিঙ্ক সেটিংস)
 
 নিজস্ব Android-ভিত্তিক বাইক GPS ট্র্যাকার। বাইকে রাখা একটি Android ফোন **Tracker**, আপনার হাতের ফোন **Remote**। কোনো ESP32/GPS/GSM মডিউল লাগে না।
 
 **Stack:** Kotlin · Jetpack Compose (Material 3) · MapLibre + OpenStreetMap (OpenFreeMap) · Supabase (Postgres + Auth + RLS) · Room · WorkManager · GitHub Actions
+
+## ডাউনলোড (Releases)
+
+APK ডাউনলোডের জায়গা GitHub **Releases** — প্রতিটি `v*` ট্যাগে CI নিজে রিলিজ বানিয়ে APK যোগ করে। Actions-এর artifact লিংক নয়: সেগুলো মেয়াদ শেষ হয় আর GitHub লগইন চায়। অ্যাপ নিজেও নতুন রিলিজ দেখলে জানায় (Settings → App updates, আর চালুর সময় একবার দেখে)।
+
+> ⚠️ **Play Protect:** অ্যাপ SOS-এর জন্য `SEND_SMS` পারমিশন চায়। Play Protect ইনস্টলের সময় এ নিয়ে সতর্কবার্তা দেখাতে পারে — এটা প্রত্যাশিত, অ্যাপ নিজের ফোন থেকে নিজের দেওয়া জরুরি নম্বরে SMS পাঠায়, অন্য কোথাও নয়।
 
 ## v1.1.0-এ যা যোগ হয়েছে
 - **দুই ভূমিকা:** লগইনের পর ফোন বেছে নেয় — বাইকের ফোন (Tracker) নাকি আমার ফোন (Remote)। ভূমিকা বদলাতে ৪ সংখ্যার PIN লাগে। Tracker ফোনে সেটিংস শুধু দেখা যায়, বদলানো যায় না।

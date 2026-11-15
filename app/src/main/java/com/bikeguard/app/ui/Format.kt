@@ -34,6 +34,11 @@ fun rememberNow(): Long {
     return now
 }
 
+/** Opens a web page in the browser; silently does nothing when no browser can handle it. */
+fun openWebPage(ctx: Context, url: String) {
+    runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+}
+
 fun openBatterySettings(ctx: Context) {
     val direct = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}"))
     try { ctx.startActivity(direct) } catch (e: Exception) {

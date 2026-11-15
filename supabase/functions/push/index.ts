@@ -45,6 +45,12 @@ async function send(token: string, data: Record<string, string>) {
 }
 
 Deno.serve(async (req) => {
+  // Optional shared secret (v1.2.21, review item #23; the check comes from the
+  // developer's own v1.2.4 code): set WEBHOOK_SECRET in the Supabase dashboard
+  // and add header x-webhook-secret to the DB webhook config. Until the
+  // secret is set, the check is off and any caller can invoke the function.
+  const secret = Deno.env.get("WEBHOOK_SECRET");
+  if (secret && req.headers.get("x-webhook-secret") !== secret) return new Response("forbidden", { status: 403 });
   const p = await req.json();
   if (p.type !== "INSERT") return new Response("ignored");
   const rec = p.record;

@@ -1,0 +1,78 @@
+# CI test steps — v1.2.21, review item #23.
+#
+# The GitHub App cannot write .github/workflows/* (403), so this diff is
+# NOT applied by the push. Apply it by hand in the signed-in browser:
+# open .github/workflows/android.yml on GitHub, Edit, paste the new jobs
+# at the end of the file (after the "Publish GitHub Release" step), commit.
+#
+# What it adds:
+#   * a `test` job: runs the JVM unit tests (AdaptivePolicy,
+#     pickActiveDevice) with `gradle :app:testDebugUnitTest` plus Android
+#     lint (`:app:lintDebug`). No secrets needed — those tests are pure
+#     functions.
+#   * a `sql-test` job: starts a vanilla postgres:16 service, applies the
+#     Supabase stubs (supabase/tests/ci-setup.sql) and the migrations the
+#     tested functions need (0001, 0002, 0003, 0011, 0012), then runs
+#     supabase/tests/sql_tests.sql (geofence_check + device_trips).
+#     The tests run in one transaction and roll back, so nothing persists.
+#
+# Verify after applying: the next push shows green `test` and `sql-test`
+# jobs next to `build`. If sql-test fails on the migration step, the first
+# suspect is a migration that needs a Supabase-only object (pg_cron,
+# supabase_realtime) — ci-setup.sql stubs the ones 0001-0003 need.
+#
+--- a/.github/workflows/android.yml
++++ b/.github/workflows/android.yml
+@@ -67,5 +67,52 @@ jobs:
+       - name: Publish GitHub Release (on tag)
+         if: startsWith(github.ref, 'refs/tags/v')
+         uses: softprops/action-gh-release@v2
+         with:
+           files: app/build/outputs/apk/release/*.apk
++
++  test:
++    name: Unit tests
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-java@v4
++        with:
++          distribution: temurin
++          java-version: 17
++      - uses: gradle/actions/setup-gradle@v4
++        with:
++          gradle-version: 8.10.2
++      - name: Run unit tests and lint
++        run: gradle :app:testDebugUnitTest :app:lintDebug --stacktrace
++
++  sql-test:
++    name: SQL tests (geofence + trips)
++    runs-on: ubuntu-latest
++    services:
++      postgres:
++        image: postgres:16
++        env:
++          POSTGRES_PASSWORD: bikeguard-test
++          POSTGRES_DB: bikeguard_test
++        ports: ["5432:5432"]
++        options: >-
++          --health-cmd="pg_isready -U postgres"
++          --health-interval=5s --health-timeout=5s --health-retries=10
++    env:
++      PGPASSWORD: bikeguard-test
++      PGDATABASE: bikeguard_test
++      PGHOST: localhost
++      PGUSER: postgres
++    steps:
++      - uses: actions/checkout@v4
++      - name: Install psql client
++        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
++      - name: Set up Supabase stubs (auth schema, roles, realtime publication)
++        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/ci-setup.sql
++      - name: Apply migrations under test
++        run: |
++          for m in 0001_init 0002_trips 0003_security_and_sharing 0011_geofence_stale 0012_trips_stops; do
++            psql -v ON_ERROR_STOP=1 -f supabase/migrations/$m.sql
++          done
++      - name: Run SQL tests
++        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/sql_tests.sql

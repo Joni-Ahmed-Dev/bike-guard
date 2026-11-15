@@ -120,6 +120,9 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         // ---- phone role ----
         RolePanel(vm)
 
+        // ---- app updates (v1.2.21): Releases are the distribution channel ----
+        UpdatePanel(vm)
+
         // ---- account ----
         AccountPanel(vm)
     }

@@ -372,6 +372,44 @@ fun RolePanel(vm: AppViewModel) {
     }
 }
 
+// ---- app updates (v1.2.21) ----
+@Composable
+fun UpdatePanel(vm: AppViewModel) {
+    val ctx = LocalContext.current
+    var checking by remember { mutableStateOf(false) }
+    var result by remember { mutableStateOf<Int?>(null) }
+    Panel(Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.update_title), style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.version, BuildConfig.VERSION_NAME),
+            color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = {
+                checking = true; result = null
+                vm.checkForUpdate { r ->
+                    checking = false
+                    // An available update shows the AppRoot dialog; here we
+                    // only report the other two outcomes.
+                    result = when (r) {
+                        is com.bikeguard.app.data.UpdateCheckResult.Available -> null
+                        com.bikeguard.app.data.UpdateCheckResult.UpToDate -> R.string.update_latest
+                        com.bikeguard.app.data.UpdateCheckResult.Failed -> R.string.update_failed
+                    }
+                }
+            },
+            enabled = !checking,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(stringResource(if (checking) R.string.update_checking else R.string.update_check)) }
+        result?.let {
+            Spacer(Modifier.height(8.dp))
+            Text(stringResource(it), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
 // ---- account ----
 @Composable
 fun AccountPanel(vm: AppViewModel) {

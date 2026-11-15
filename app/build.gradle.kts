@@ -25,8 +25,8 @@ android {
         applicationId = "com.bikeguard.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 32
-        versionName = "1.2.20"
+        versionCode = 33
+        versionName = "1.2.21"
         buildConfigField("String", "SUPABASE_URL", "\"${cfg("SUPABASE_URL")}\"")
         buildConfigField("String", "SHARE_BASE_URL", "\"${cfg("SHARE_BASE_URL")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${cfg("SUPABASE_ANON_KEY")}\"")
@@ -48,8 +48,15 @@ android {
 
     buildTypes {
         release {
-            // Turn on once you have tested a release build on a real phone.
-            isMinifyEnabled = false
+            // v1.2.21 (review item #23): R8 on. The rules live in proguard-rules.pro
+            // (kotlinx.serialization, Room, MapLibre, OkHttp); CI going green is the
+            // check that nothing the app reflects on was stripped. APK was ~27 MB.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
@@ -89,11 +96,18 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    // v1.2.21: 1.1.0 is the first stable release (Jul 2025). Note it deprecates
+    // every API in the artifact (MasterKey, EncryptedSharedPreferences) in favour
+    // of platform Keystore APIs — a later item should migrate Prefs off it.
+    implementation("androidx.security:security-crypto:1.1.0")
 
     implementation("org.maplibre.gl:android-sdk:11.5.2")
     implementation("androidx.fragment:fragment:1.8.4")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
     implementation("com.google.firebase:firebase-messaging")
+
+    // Unit tests (v1.2.21, review item #23): AdaptivePolicy + pickActiveDevice.
+    // Run with: gradle :app:testDebugUnitTest (CI runs this in the test job).
+    testImplementation("junit:junit:4.13.2")
 }

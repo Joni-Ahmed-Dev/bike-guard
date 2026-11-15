@@ -368,4 +368,13 @@
     <string name="pin_reset_hint">অ্যাকাউন্টের পাসওয়ার্ড দাও। রোলের পিন মুছে যাবে, আর নতুন রোল ও পিন বেছে নিতে হবে।</string>
     <string name="pin_reset_wrong">ভুল পাসওয়ার্ড</string>
     <string name="pin_reset">পিন রিসেট করো</string>
+    <string name="update_title">অ্যাপ আপডেট</string>
+    <string name="update_check">আপডেট দেখুন</string>
+    <string name="update_checking">দেখা হচ্ছে…</string>
+    <string name="update_latest">সর্বশেষ সংস্করণেই আছেন।</string>
+    <string name="update_failed">আপডেট দেখা যায়নি। সংযোগ দেখে আবার চেষ্টা করুন।</string>
+    <string name="update_available_title">%1$s সংস্করণ এসেছে</string>
+    <string name="update_available_body">GitHub-এ BikeGuard-এর নতুন সংস্করণ এসেছে। রিলিজ পাতা থেকে APK ডাউনলোড করে এই সংস্করণের উপর ইনস্টল করুন।</string>
+    <string name="update_download">ডাউনলোড</string>
+    <string name="update_later">পরে</string>
 </resources>
