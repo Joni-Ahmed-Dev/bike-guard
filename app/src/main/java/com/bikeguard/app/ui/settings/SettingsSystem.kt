@@ -274,12 +274,12 @@ fun SoundsPanel() {
     Panel(Modifier.fillMaxWidth()) {
         PanelHeader(Icons.Default.VolumeUp, stringResource(R.string.notif_sound_title))
         Spacer(Modifier.height(8.dp))
-        RingtoneRow(stringResource(R.string.ringtone_alerts), alertSoundName, icon = Icons.Default.NotificationsActive) {
+        RingtoneRow(stringResource(R.string.ringtone_alerts), alertSoundName, onPick = {
             alertSoundPicker.launch(Notifier.ringtonePickerIntent(ctx, alertSound, ctx.getString(R.string.ringtone_pick_title)))
-        }
-        RingtoneRow(stringResource(R.string.ringtone_general), generalSoundName, icon = Icons.Default.Notifications) {
+        }, icon = Icons.Default.NotificationsActive)
+        RingtoneRow(stringResource(R.string.ringtone_general), generalSoundName, onPick = {
             generalSoundPicker.launch(Notifier.ringtonePickerIntent(ctx, generalSound, ctx.getString(R.string.ringtone_pick_title)))
-        }
+        }, icon = Icons.Default.Notifications)
         // Issue #6: the Remote phone never asked for POST_NOTIFICATIONS (only the
         // tracker setup flow did), so alerts could never appear there. Denial is
         // fine: alerts still land in the Alerts tab, just without a push.
