@@ -386,21 +386,14 @@ fun DashboardScreen(
     }
 }
 
-/** 48.dp mint circle with a black icon (light) / mint-on-translucent-mint icon (dark). */
+/** 48dp pale-mint circle with a Leaf icon — same as the Settings rows. */
 @Composable
 private fun AccentCircle(icon: ImageVector) {
     Box(
-        Modifier.size(48.dp).background(
-            if (Palette.isLight) Color(0xFF91E9AD) else Color(0xFF91E9AD).copy(alpha = 0.16f),
-            CircleShape,
-        ),
+        Modifier.size(48.dp).background(Palette.Ember.copy(alpha = 0.16f), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            icon, null,
-            tint = if (Palette.isLight) Color(0xFF111111) else Color(0xFF91E9AD),
-            modifier = Modifier.size(24.dp),
-        )
+        Icon(icon, null, tint = Palette.Leaf, modifier = Modifier.size(24.dp))
     }
 }
 

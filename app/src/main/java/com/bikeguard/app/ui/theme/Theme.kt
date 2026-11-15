@@ -134,6 +134,6 @@ fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> 
         modifier = modifier,
         shape = RoundedCornerShape(24.dp),
         color = Palette.Card,
-        shadowElevation = 2.dp,
+        shadowElevation = 0.dp,
     ) { Column(Modifier.padding(16.dp), content = content) }
 }
