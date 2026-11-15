@@ -59,8 +59,9 @@ fun ViewerControls(vm: ViewerViewModel) {
     val lastSeenText = if (lastSeenMs > 0) stringResource(R.string.ctl_last_seen, agoText(ctx, lastSeenMs, now))
     else stringResource(R.string.ctl_last_seen_none)
 
+    // Last seen now lives in the sheet's odometer row (screenshot 2, v1.2.24); the
+    // SOS dialog below still shows it, so the variable stays.
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(lastSeenText, color = Palette.Muted, style = MaterialTheme.typography.labelMedium)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ControlButton(Icons.Default.MyLocation, R.string.ctl_locate, Modifier.weight(1f)) { vm.send("locate") }
             ControlButton(Icons.Default.Bolt, R.string.ctl_live, Modifier.weight(1f)) { vm.send("live") }
@@ -70,7 +71,7 @@ fun ViewerControls(vm: ViewerViewModel) {
             ) { vm.send(if (vm.sirenOn) "siren_off" else "siren_on") }
             ControlButton(
                 if (armed) Icons.Default.LockOpen else Icons.Default.Lock, if (armed) R.string.ctl_disarm else R.string.ctl_arm,
-                Modifier.weight(1f), tint = if (armed) Palette.Signal else Palette.Ember,
+                Modifier.weight(1f), tint = if (armed) Palette.Signal else Palette.Leaf,
             ) { vm.send(if (armed) "disarm" else "arm") }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -82,7 +83,9 @@ fun ViewerControls(vm: ViewerViewModel) {
         // Remote SOS (v1.2.19): the hold button used to exist only on the
         // Tracker tab. This sends an "sos" command the bike executes at once
         // (same immediate SOS as the hold). A confirm dialog, not a bare tap:
-        // a stray tap must never text the emergency contact.
+        // a stray tap must never text the emergency contact. It sits below the
+        // 8 action buttons (screenshot 2 shows only those 8); reachable by
+        // scrolling once the sheet is fully expanded.
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ControlButton(Icons.Default.Warning, R.string.ctl_sos, Modifier.weight(1f), tint = Palette.Danger) { showSos = true }
         }
@@ -114,8 +117,8 @@ fun ViewerControls(vm: ViewerViewModel) {
 }
 
 @Composable
-private fun ControlButton(icon: ImageVector, label: Int, modifier: Modifier, tint: Color = Palette.Ember, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(16.dp)
+private fun ControlButton(icon: ImageVector, label: Int, modifier: Modifier, tint: Color = Palette.Leaf, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(20.dp)
     Surface(
         shape = shape, color = Palette.Card, border = BorderStroke(1.dp, Palette.Stroke),
         // Merged descendants + Button role (v1.2.20): TalkBack used to land on the
@@ -123,8 +126,8 @@ private fun ControlButton(icon: ImageVector, label: Int, modifier: Modifier, tin
         modifier = modifier.clip(shape).clickable(onClick = onClick)
             .semantics(mergeDescendants = true) { role = Role.Button },
     ) {
-        Column(Modifier.padding(vertical = 12.dp, horizontal = 4.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
+        Column(Modifier.padding(vertical = 14.dp, horizontal = 4.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, null, tint = tint, modifier = Modifier.size(26.dp))
             Spacer(Modifier.height(4.dp))
             Text(stringResource(label), style = MaterialTheme.typography.labelMedium, maxLines = 1)
         }
@@ -207,7 +210,7 @@ private fun LimitDialog(vm: ViewerViewModel, onClose: () -> Unit) {
                         label = { Text(if (v == 0) stringResource(R.string.limit_off) else stringResource(R.string.limit_kmh, v)) },
                         modifier = Modifier.height(48.dp),
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Palette.Ember.copy(alpha = 0.2f), selectedLabelColor = Palette.Ember,
+                            selectedContainerColor = Palette.Ember.copy(alpha = 0.25f), selectedLabelColor = Palette.Leaf,
                         ),
                     )
                 }
@@ -249,7 +252,7 @@ private fun GeofenceDialog(vm: ViewerViewModel, onClose: () -> Unit) {
                             selected = radius == r, onClick = { radius = r }, label = { Text(stringResource(R.string.geo_radius, r)) },
                             modifier = Modifier.height(48.dp),
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Palette.Ember.copy(alpha = 0.2f), selectedLabelColor = Palette.Ember,
+                                selectedContainerColor = Palette.Ember.copy(alpha = 0.25f), selectedLabelColor = Palette.Leaf,
                             ),
                         )
                     }

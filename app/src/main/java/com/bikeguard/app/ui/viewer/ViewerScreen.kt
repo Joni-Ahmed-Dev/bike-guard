@@ -8,6 +8,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,16 +20,24 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -40,7 +49,6 @@ import com.bikeguard.app.data.LocationDto
 import com.bikeguard.app.ui.agoText
 import com.bikeguard.app.ui.rememberNow
 import com.bikeguard.app.ui.theme.Palette
-import com.bikeguard.app.ui.theme.Panel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.maplibre.android.geometry.LatLng
@@ -61,10 +69,10 @@ private enum class Status(val label: Int) {
     OFFLINE(R.string.status_offline),
 }
 
-/** Resolved at composition time (v1.2.20): the old enum stored Palette colors at class-load time, so a theme flip after the process started kept the dark colors. */
+/** Resolved at composition time (v1.2.20): the old enum stored Palette colors at class-load time, so a theme flip after the process started kept the dark colors. Delayed uses Warn (peach, v1.2.24): Ember is mint now, so it must never mean "delayed" again. */
 private fun statusColor(status: Status): Color = when (status) {
     Status.LIVE -> Palette.Signal
-    Status.DELAYED -> Palette.Ember
+    Status.DELAYED -> Palette.Warn
     Status.OFFLINE -> Palette.Muted
 }
 
@@ -152,9 +160,10 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
                                 onClick = { d.id?.let(vm::select) },
                                 label = { Text(d.name) },
                                 modifier = Modifier.height(48.dp),
+                                shape = RoundedCornerShape(50),
                                 colors = FilterChipDefaults.filterChipColors(
                                     containerColor = Palette.Surface.copy(alpha = 0.9f), labelColor = Palette.Text,
-                                    selectedContainerColor = Palette.Ember, selectedLabelColor = Palette.Ink,
+                                    selectedContainerColor = Palette.Ember, selectedLabelColor = Palette.Text,
                                 ),
                             )
                         }
@@ -177,6 +186,7 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
                         onClick = { OfflineMap.downloadAround(ctx, latest.lat, latest.lng) { offlineMsg = it } },
                         label = { Text(stringResource(R.string.offline_map)) },
                         modifier = Modifier.height(48.dp),
+                        shape = RoundedCornerShape(50),
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = Palette.Surface.copy(alpha = 0.9f), labelColor = Palette.Text,
                         ),
@@ -196,7 +206,7 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
             // only control must meet the 48dp touch target (v1.2.20).
             FloatingActionButton(
                 onClick = { follow = true },
-                containerColor = Palette.Surface, contentColor = if (follow) Palette.Ember else Palette.Muted,
+                containerColor = Palette.Surface, contentColor = if (follow) Palette.Leaf else Palette.Muted,
                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = PEEK + 16.dp),
             ) { Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.recenter)) }
         }
@@ -241,11 +251,19 @@ private fun SheetContent(
             else -> {
                 // Tapping the header toggles the sheet fully open / back to peek (issue #2),
                 // so the whole sheet is reachable even if a drag is swallowed.
+                // Status pill, same as Dashboard (v1.2.23): pale pill, colored dot, dark text.
                 Row(Modifier.fillMaxWidth().clickable(onClick = onToggleSheet), verticalAlignment = Alignment.CenterVertically) {
                     Text(deviceName, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                    Box(Modifier.size(8.dp).background(statusColor(status), CircleShape))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(status.label), color = statusColor(status), style = MaterialTheme.typography.labelMedium)
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (Palette.isLight) Color(0xFFF1F4F0) else Color(0xFF232B3A),
+                    ) {
+                        Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(8.dp).background(statusColor(status), CircleShape))
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(status.label), color = Palette.Text, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
@@ -254,31 +272,44 @@ private fun SheetContent(
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Mini(stringResource(R.string.stat_battery), latest.battery?.let { "$it%" } ?: stringResource(R.string.none), Modifier.weight(1f), charging = latest.isCharging == true)
-                    Mini(stringResource(R.string.stat_updated), agoText(ctx, latest.recordedAtMs, now), Modifier.weight(1f))
-                    Mini(stringResource(R.string.stat_accuracy), latest.accuracy?.let { stringResource(R.string.unit_m, it.toInt()) } ?: stringResource(R.string.none), Modifier.weight(1f))
+                    Mini(stringResource(R.string.stat_battery), latest.battery?.let { "$it%" } ?: stringResource(R.string.none), Icons.Default.BatteryFull, Palette.Leaf, Modifier.weight(1f), charging = latest.isCharging == true)
+                    Mini(stringResource(R.string.stat_updated), agoText(ctx, latest.recordedAtMs, now), Icons.Default.Schedule, Palette.Text, Modifier.weight(1f))
+                    Mini(stringResource(R.string.stat_accuracy), latest.accuracy?.let { stringResource(R.string.unit_m, it.toInt()) } ?: stringResource(R.string.none), Icons.Default.MyLocation, Palette.Leaf, Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(16.dp))
                 Button(
                     onClick = { navigate(ctx, latest.lat, latest.lng) },
-                    shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().height(56.dp),
                 ) {
                     Icon(Icons.Default.Navigation, null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.navigate), fontWeight = FontWeight.SemiBold)
                 }
-                vm.selectedDevice?.let { d ->
-                    val odo = d.odometerKm ?: 0.0
-                    if (odo > 0) {
-                        val svc = d.nextServiceKm?.takeIf { it > 0 }?.let { n ->
-                            val left = (n - odo).toInt()
-                            if (left >= 0) stringResource(R.string.service_in, left) else stringResource(R.string.service_overdue)
+                // Odometer + last seen row (screenshot 2): value parts bold, separated by a
+                // thin divider. The service line lives on the Dashboard; it is not shown here.
+                val odo = vm.selectedDevice?.odometerKm ?: 0.0
+                val lastSeenMs = latest.recordedAtMs
+                if (odo > 0 || lastSeenMs > 0) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        if (odo > 0) {
+                            Icon(Icons.Default.Speed, null, tint = Palette.Text, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(boldFromFirstDigit(stringResource(R.string.odo_line, odo.toInt())), style = MaterialTheme.typography.bodyMedium)
                         }
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            listOfNotNull(stringResource(R.string.odo_line, odo.toInt()), svc).joinToString("  ·  "),
-                            color = Palette.Muted, style = MaterialTheme.typography.labelMedium,
-                        )
+                        if (odo > 0 && lastSeenMs > 0) {
+                            Spacer(Modifier.width(12.dp))
+                            VerticalDivider(Modifier.height(20.dp), color = Palette.Stroke)
+                            Spacer(Modifier.width(12.dp))
+                        }
+                        if (lastSeenMs > 0) {
+                            Icon(Icons.Default.DateRange, null, tint = Palette.Text, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                boldFromFirstDigit(stringResource(R.string.ctl_last_seen, agoText(ctx, lastSeenMs, now))),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -289,13 +320,23 @@ private fun SheetContent(
 }
 
 @Composable
-private fun Mini(label: String, value: String, modifier: Modifier = Modifier, charging: Boolean = false) {
-    Panel(modifier) {
-        Text(label, color = Palette.Muted, style = MaterialTheme.typography.labelMedium)
-        Spacer(Modifier.height(2.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (charging) Icon(Icons.Default.BatteryChargingFull, null, tint = Palette.Signal, modifier = Modifier.size(16.dp))
-            Text(value, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+private fun Mini(label: String, value: String, icon: ImageVector, iconTint: Color, modifier: Modifier = Modifier, charging: Boolean = false) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = Palette.Card,
+        border = BorderStroke(1.dp, Palette.Stroke),
+    ) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                if (charging) Icons.Default.BatteryChargingFull else icon, null,
+                tint = if (charging) Palette.Signal else iconTint, modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(label, color = Palette.Muted, style = MaterialTheme.typography.labelMedium)
+                Text(value, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+            }
         }
     }
 }
@@ -310,4 +351,14 @@ private fun Skeleton(modifier: Modifier) {
 private fun navigate(ctx: Context, lat: Double, lng: Double) {
     val uri = Uri.parse("geo:0,0?q=$lat,$lng(${Uri.encode("BikeGuard")})")
     runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+}
+
+/** Bolds the value part of a label line ("Odometer 1 km" -> "1 km" bold), starting at the first digit. Char.isDigit is Unicode-aware, so Bengali digits work too. */
+private fun boldFromFirstDigit(text: String): AnnotatedString {
+    val idx = text.indexOfFirst { it.isDigit() }
+    if (idx < 0) return AnnotatedString(text)
+    return buildAnnotatedString {
+        append(text.substring(0, idx))
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(text.substring(idx)) }
+    }
 }

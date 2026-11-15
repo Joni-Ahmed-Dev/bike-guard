@@ -31,7 +31,9 @@ import com.bikeguard.app.data.THEME_LIGHT
 /**
  * Master design reference (v1.2.23): pale grey-green page (#F1F4F0), white cards,
  * near-black text (#111111), mint primary (#91E9AD), teal live signal (#54CDBA),
- * peach warning (#FFC178). Dark values are unchanged from before.
+ * peach warning (#FFC178). Leaf (#63A54E, sampled from the Viewer mock) is the
+ * saturated green for icons on white in light mode — mint is too pale there.
+ * Dark values are unchanged from before.
  */
 object Palette {
     /**
@@ -64,6 +66,8 @@ object Palette {
     private val LightText = Color(0xFF111111)
     private val LightMuted = Color(0xFF6B7A6E)
     private val LightWarn = Color(0xFFFFC178)
+    // Saturated green for icons on white (light only); dark keeps the amber Ember.
+    private val LightLeaf = Color(0xFF63A54E)
 
     val Ink get() = if (isLight) LightInk else DarkInk
     val Surface get() = if (isLight) LightSurface else DarkSurface
@@ -76,6 +80,8 @@ object Palette {
     val Muted get() = if (isLight) LightMuted else DarkMuted
     // Warning states that must stay amber/peach even though the primary is now mint.
     val Warn get() = if (isLight) LightWarn else DarkEmber
+    // Saturated green for icons on white in light mode; dark keeps amber.
+    val Leaf get() = if (isLight) LightLeaf else DarkEmber
 }
 
 /** Whether the app should currently draw the light theme: the stored mode, with "system" following the phone. */
