@@ -463,11 +463,28 @@ class TrackingService : Service() {
         checkGuardSchedule()
         val p = app.prefs
         if (!p.isLoggedIn || p.isRemote) return
-        val s = try { app.api.getDeviceSettings(p.deviceId) } catch (e: IOException) { null } ?: return
+        val s = try { app.api.getDeviceSettings(p.deviceId) } catch (e: IOException) { null }
+        if (s == null) {
+            // No settings row yet (a tracker whose Remote never saved settings):
+            // there is nothing to adopt, so the local values are the truth. Mark
+            // adopted so the stateDirty patch can mirror them; a fetch error
+            // leaves the flag false and the patch keeps omitting. Only checked
+            // while the flag is false, so this costs one extra call at most.
+            if (!p.deviceStateAdopted) {
+                val exists = try { app.api.deviceSettingsRowExists(p.deviceId) } catch (e: IOException) { null }
+                if (exists == false) { p.deviceStateAdopted = true; p.stateDirty = true }
+            }
+            return
+        }
         val updatedMs = isoToMs(s.updatedAt.orEmpty())
         if (updatedMs <= lastSettingsSeenMs && updatedMs != 0L) return
         if (updatedMs > 0L) lastSettingsSeenMs = updatedMs
         applySettings(s)
+        // First settings application since install: the local armed / speed-limit
+        // values are now the adopted ones, so the stateDirty patch may mirror
+        // them (v1.2.17). stateDirty forces a re-patch: an earlier flush may
+        // already have sent — and cleared — a patch that omitted them.
+        if (!p.deviceStateAdopted) { p.deviceStateAdopted = true; p.stateDirty = true }
         try { app.api.markSettingsApplied(p.deviceId) } catch (e: IOException) { /* retried next poll */ }
     }
 

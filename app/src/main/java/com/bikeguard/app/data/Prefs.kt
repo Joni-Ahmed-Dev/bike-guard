@@ -74,6 +74,8 @@ class Prefs(private val context: Context) {
         odometerAdopted = false
         // Same for the service interval adopt (v1.2.16).
         serviceIntervalAdopted = false
+        // Same for the armed / speed-limit adopt (v1.2.17).
+        deviceStateAdopted = false
     }
     /** True once this phone's hardware key has been stamped on its server device row
      *  (devices.hardware_key, migration 0008). False until the stamp succeeds, so a
@@ -169,13 +171,26 @@ class Prefs(private val context: Context) {
         get() = sp.getBoolean("odo_adopted", false)
         set(v) = sp.edit { putBoolean("odo_adopted", v) }
 
-    /** True once this phone has pulled the server's service interval
+    /** True once this phone has applied the server's service interval
      *  (device_settings.service_km) into Prefs (v1.2.16). A reinstall wipes
      *  serviceIntervalKm to 0; until the adopt runs, 0 means "unknown", not
      *  "reminder off" — markServiced() must not compute from it. */
     var serviceIntervalAdopted: Boolean
         get() = sp.getBoolean("svc_interval_adopted", false)
         set(v) = sp.edit { putBoolean("svc_interval_adopted", v) }
+
+    /** True once this phone has applied the server's device_settings row at
+     *  least once since install (v1.2.17) — or learned there is no row yet.
+     *  Until then the stateDirty patch omits armed / speed limit /
+     *  tracking_expected: a reinstall wipes those to false/0, and the first
+     *  flush must never overwrite the server row with them. The service loop
+     *  owns the adoption (applySettings, via GuardControl.setArmed for the
+     *  guard), because arming has side effects the flush must not duplicate
+     *  (anchor, TrackerState, tracking start). Reset on a new device row and
+     *  on sign-out, when the local state is untrusted again. */
+    var deviceStateAdopted: Boolean
+        get() = sp.getBoolean("device_state_adopted", false)
+        set(v) = sp.edit { putBoolean("device_state_adopted", v) }
 
     /** True when the device row on the server is out of date and should be patched on the next sync. */
     var stateDirty: Boolean
@@ -354,6 +369,10 @@ class Prefs(private val context: Context) {
         remove("at"); remove("rt"); remove("uid"); remove("email")
         putBoolean("tracking_active", false)
         putBoolean("armed", false); putBoolean("state_dirty", true)
+        // A new session must re-adopt the server state before the patch may
+        // mirror armed / speed limit again (v1.2.17): sign-out forces armed
+        // false locally, and that wiped value must never reach the server row.
+        putBoolean("device_state_adopted", false)
         // Sign-out disarms the guard: the saved anchor must go too, or a
         // later re-arm at a new spot would measure against the old one.
         remove("guard_anchor_lat"); remove("guard_anchor_lng"); remove("guard_anchor_at_ms")

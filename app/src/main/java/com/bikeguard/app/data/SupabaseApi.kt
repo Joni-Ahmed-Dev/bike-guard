@@ -9,6 +9,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -421,31 +422,71 @@ class SupabaseApi(private val prefs: Prefs) {
         return runCatching { json.decodeFromString(ListSerializer(DeviceSettingsDto.serializer()), r.body) }.getOrNull()?.firstOrNull()
     }
 
+    /** True when a device_settings row exists for this device, false when the
+     *  server answers with an empty list, null when it could not be read.
+     *  Lets the tracker tell "no row yet" (local values are the truth) from
+     *  "fetch failed" (keep omitting wiped values from the state patch). */
+    suspend fun deviceSettingsRowExists(deviceId: String): Boolean? {
+        val r = authed {
+            builder("/rest/v1/device_settings?device_id=eq.$deviceId&select=device_id&limit=1", it).get().build()
+        }
+        if (!r.ok) return null
+        return runCatching {
+            json.parseToJsonElement(r.body).jsonArray.isNotEmpty()
+        }.getOrNull()
+    }
+
     /**
-     * Upsert one settings row. [touchUpdated] is true for a Remote edit (marks it as new work for
-     * the tracker). The tracker never calls this any more: it used to mirror its own state back
-     * with touchUpdated = false, but that whole-row upsert could overwrite a Remote edit made
-     * in the same ~30 s window with stale local values, so it now PATCHes only the fields a
-     * remote command actually changed (see patchTrackerSettings).
+     * The Remote phone saves exactly the fields the user just changed — and
+     * nothing else (v1.2.17). The old whole-row upsert rebuilt the row from
+     * this phone's local Prefs, so a settings change tapped before
+     * loadRemoteSettings() finished could overwrite the server row with
+     * wiped defaults (service_km 0, an empty schedule, armed false). This is
+     * a field-scoped upsert instead: POST with on_conflict=device_id and
+     * merge-duplicates, so the row is created when missing (other columns
+     * take their DB defaults) and only the listed columns change when it
+     * exists. updated_at is always touched, so the tracker sees new work;
+     * applied_at is never touched here — the tracker stamps it when it applies.
+     * A schedule side is cleared with an explicit null (JsonNull); the
+     * serializer would drop nulls, so the body is built by hand.
      */
-    suspend fun saveDeviceSettings(dto: DeviceSettingsDto, touchUpdated: Boolean = true): Boolean = try {
-        // Built by hand (not the serializer): clearing the schedule must send an explicit null,
-        // and the serializer would drop nulls, so merge-duplicates would keep the old value.
+    suspend fun patchDeviceSettings(
+        deviceId: String,
+        mode: String? = null,
+        intervalSec: Int? = null,
+        speedLimitKmh: Int? = null,
+        autoArm: Boolean? = null,
+        sirenOnAlert: Boolean? = null,
+        sosSms: Boolean? = null,
+        crashEnabled: Boolean? = null,
+        sosNumber: String? = null,
+        serviceKm: Int? = null,
+        guardScheduleStart: Int? = null,
+        guardScheduleEnd: Int? = null,
+        clearScheduleStart: Boolean = false,
+        clearScheduleEnd: Boolean = false,
+    ): Boolean = try {
+        val hasChange = mode != null || intervalSec != null || speedLimitKmh != null ||
+            autoArm != null || sirenOnAlert != null || sosSms != null || crashEnabled != null ||
+            sosNumber != null || serviceKm != null || guardScheduleStart != null ||
+            guardScheduleEnd != null || clearScheduleStart || clearScheduleEnd
+        if (!hasChange) return true
         val payload = buildJsonObject {
-            put("device_id", dto.deviceId)
-            put("mode", dto.mode)
-            put("interval_sec", dto.intervalSec)
-            put("speed_limit_kmh", dto.speedLimitKmh)
-            put("guard_armed", dto.guardArmed)
-            put("auto_arm", dto.autoArm)
-            put("siren_on_alert", dto.sirenOnAlert)
-            put("sos_sms", dto.sosSms)
-            put("crash_enabled", dto.crashEnabled)
-            put("sos_number", dto.sosNumber)
-            put("service_km", dto.serviceKm)
-            put("guard_schedule_start", dto.guardScheduleStart)
-            put("guard_schedule_end", dto.guardScheduleEnd)
-            if (touchUpdated) put("updated_at", java.time.Instant.now().toString())
+            put("device_id", deviceId)
+            mode?.let { put("mode", it) }
+            intervalSec?.let { put("interval_sec", it) }
+            speedLimitKmh?.let { put("speed_limit_kmh", it) }
+            autoArm?.let { put("auto_arm", it) }
+            sirenOnAlert?.let { put("siren_on_alert", it) }
+            sosSms?.let { put("sos_sms", it) }
+            crashEnabled?.let { put("crash_enabled", it) }
+            sosNumber?.let { put("sos_number", it) }
+            serviceKm?.let { put("service_km", it) }
+            if (clearScheduleStart) put("guard_schedule_start", JsonNull)
+            else guardScheduleStart?.let { put("guard_schedule_start", it) }
+            if (clearScheduleEnd) put("guard_schedule_end", JsonNull)
+            else guardScheduleEnd?.let { put("guard_schedule_end", it) }
+            put("updated_at", java.time.Instant.now().toString())
         }.toString()
         authed {
             builder("/rest/v1/device_settings?on_conflict=device_id", it)

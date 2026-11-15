@@ -259,12 +259,17 @@ class SyncManager(
             // mirror armed / odometer / limits to the server so the Viewer can show them
             if (prefs.stateDirty) {
                 val patch = DeviceStatePatch(
-                    armed = prefs.parkingArmed, trackingExpected = prefs.shouldTrack,
+                    // Only mirror armed / speed limit / tracking_expected once the
+                    // server state is adopted (v1.2.17): a fresh install's wiped
+                    // false/0 must never overwrite the server row. tracking_expected
+                    // derives from the same wiped values, so it is gated too.
+                    armed = prefs.parkingArmed.takeIf { prefs.deviceStateAdopted },
+                    trackingExpected = prefs.shouldTrack.takeIf { prefs.deviceStateAdopted },
                     // Only send the odometer once adopted: a fresh install's local 0
                     // must never overwrite the server's stored value (v1.2.11).
                     odometerKm = prefs.odometerKm.toDouble().takeIf { prefs.odometerAdopted },
                     nextServiceKm = prefs.nextServiceKm.takeIf { it > 0f }?.toDouble(),
-                    speedLimitKmh = prefs.speedLimitKmh,
+                    speedLimitKmh = prefs.speedLimitKmh.takeIf { prefs.deviceStateAdopted },
                 )
                 val res = api.patchDeviceState(prefs.deviceId, patch)
                 if (res.ok) prefs.stateDirty = false else fail("patch: ${res.error}")

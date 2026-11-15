@@ -103,7 +103,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     }
     val smsPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         smsDenied = !ok
-        if (ok) { sms = true; prefs.sosSms = true; vm.pushSettings() }
+        if (ok) { sms = true; prefs.sosSms = true; vm.pushSettingsPatch(sosSms = true) }
     }
     // ---- notification sounds (issue #8): one ringtone per channel ----
     var alertSound by remember { mutableStateOf(prefs.alertRingtoneUri) }
@@ -318,19 +318,21 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         Panel(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.set_guard), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
-            SwitchRow(stringResource(R.string.guard_auto), null, autoArm) { autoArm = it; prefs.autoArm = it; if (isRemote) vm.pushSettings() }
-            SwitchRow(stringResource(R.string.guard_siren), null, siren) { siren = it; prefs.sirenOnAlert = it; vm.pushSettings() }
+            SwitchRow(stringResource(R.string.guard_auto), null, autoArm) { autoArm = it; prefs.autoArm = it; if (isRemote) vm.pushSettingsPatch(autoArm = it) }
+            SwitchRow(stringResource(R.string.guard_siren), null, siren) { siren = it; prefs.sirenOnAlert = it; vm.pushSettingsPatch(sirenOnAlert = it) }
         }
 
         // ---- safety ----
         Panel(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.set_safety), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
-            SwitchRow(stringResource(R.string.safety_crash), null, crash) { crash = it; prefs.crashDetection = it; vm.pushSettings() }
+            SwitchRow(stringResource(R.string.safety_crash), null, crash) { crash = it; prefs.crashDetection = it; vm.pushSettingsPatch(crashEnabled = it) }
             SwitchRow(stringResource(R.string.safety_sms), stringResource(R.string.safety_sms_hint), sms) { on ->
-                if (!on) { sms = false; prefs.sosSms = false }
+                // Only the OFF branch pushes here: turning ON pushes from the
+                // permission callback once granted, so the server never briefly
+                // sees the still-false local value (v1.2.17).
+                if (!on) { sms = false; prefs.sosSms = false; vm.pushSettingsPatch(sosSms = false) }
                 else smsPerm.launch(Manifest.permission.SEND_SMS)
-                vm.pushSettings()
             }
             if (smsDenied) Text(stringResource(R.string.sms_perm_needed), color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
             OutlinedTextField(
@@ -338,7 +340,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 label = { Text(stringResource(R.string.safety_number)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                    .onFocusChanged { if (!it.isFocused) vm.pushSettings() },
+                    .onFocusChanged { if (!it.isFocused) vm.pushSettingsPatch(sosNumber = prefs.emergencyNumber) },
             )
             Spacer(Modifier.height(14.dp))
             Text(stringResource(R.string.limit_title), style = MaterialTheme.typography.titleMedium)
@@ -346,7 +348,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             ChipRow(
                 listOf(0, 60, 80, 100, 120), limit,
                 { if (it == 0) ctx.getString(R.string.limit_off) else ctx.getString(R.string.limit_kmh, it) },
-            ) { limit = it; prefs.speedLimitKmh = it; prefs.stateDirty = true; vm.pushSettings() }
+            ) { limit = it; prefs.speedLimitKmh = it; prefs.stateDirty = true; vm.pushSettingsPatch(speedLimitKmh = it) }
         }
 
         // ---- service reminder ----
@@ -364,7 +366,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
             ) {
                 serviceEvery = it; prefs.scheduleService(it)
                 odo = prefs.odometerKm.toInt(); next = prefs.nextServiceKm.toInt()
-                vm.pushSettings()
+                vm.pushSettingsPatch(serviceKm = it)
             }
             if (serviceEvery > 0) {
                 Spacer(Modifier.height(8.dp))
@@ -372,7 +374,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                     // On the Remote phone this must reach the bike as a command; only changing
                     // this phone's prefs would silently do nothing.
                     if (isRemote) vm.sendRemoteCommand("mark_serviced")
-                    else { prefs.markServiced(); next = prefs.nextServiceKm.toInt(); vm.pushSettings() }
+                    else { prefs.markServiced(); next = prefs.nextServiceKm.toInt() }
                 }) {
                     Text(stringResource(R.string.service_mark))
                 }
@@ -402,8 +404,10 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f).onFocusChanged {
                             if (!it.isFocused) {
-                                prefs.guardScheduleStart = schedStart.toIntOrNull()?.takeIf { h -> h in 0..23 } ?: -1
-                                vm.pushSettings()
+                                val h = schedStart.toIntOrNull()?.takeIf { h -> h in 0..23 }
+                                prefs.guardScheduleStart = h ?: -1
+                                if (h != null) vm.pushSettingsPatch(guardScheduleStart = h)
+                                else vm.pushSettingsPatch(clearScheduleStart = true)
                             }
                         },
                     )
@@ -413,8 +417,10 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f).onFocusChanged {
                             if (!it.isFocused) {
-                                prefs.guardScheduleEnd = schedEnd.toIntOrNull()?.takeIf { h -> h in 0..23 } ?: -1
-                                vm.pushSettings()
+                                val h = schedEnd.toIntOrNull()?.takeIf { h -> h in 0..23 }
+                                prefs.guardScheduleEnd = h ?: -1
+                                if (h != null) vm.pushSettingsPatch(guardScheduleEnd = h)
+                                else vm.pushSettingsPatch(clearScheduleEnd = true)
                             }
                         },
                     )
@@ -423,7 +429,7 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                 TextButton(onClick = {
                     schedStart = ""; schedEnd = ""
                     prefs.guardScheduleStart = -1; prefs.guardScheduleEnd = -1
-                    vm.pushSettings()
+                    vm.pushSettingsPatch(clearScheduleStart = true, clearScheduleEnd = true)
                 }) { Text(stringResource(R.string.schedule_off)) }
             }
 

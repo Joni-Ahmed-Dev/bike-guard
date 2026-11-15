@@ -30,14 +30,19 @@ data class DeviceDto(
 /** What the tracker phone mirrors to its device row. */
 @Serializable
 data class DeviceStatePatch(
-    val armed: Boolean,
-    @SerialName("tracking_expected") val trackingExpected: Boolean,
+    /** Null = omit from the PATCH (explicitNulls = false). The tracker only sends
+     *  armed / tracking_expected / speed limit once it has adopted the server's
+     *  device_settings row (v1.2.17); before that a fresh install's wiped
+     *  false/0 must never overwrite the server row. tracking_expected derives
+     *  from the same wiped values, so it is gated the same way. */
+    val armed: Boolean? = null,
+    @SerialName("tracking_expected") val trackingExpected: Boolean? = null,
     /** Null = omit from the PATCH (explicitNulls = false). The tracker only sends the
      *  odometer once it has adopted the server's value (v1.2.11); before that a
      *  fresh install's local 0 must never overwrite the server's stored odometer. */
     @SerialName("odometer_km") val odometerKm: Double? = null,
     @SerialName("next_service_km") val nextServiceKm: Double? = null,
-    @SerialName("speed_limit_kmh") val speedLimitKmh: Int,
+    @SerialName("speed_limit_kmh") val speedLimitKmh: Int? = null,
 )
 
 @Serializable

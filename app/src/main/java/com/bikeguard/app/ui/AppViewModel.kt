@@ -122,22 +122,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     // ---------- server-synced settings (Remote edits, tracker applies) ----------
 
-    private fun settingsFromPrefs() = DeviceSettingsDto(
-        deviceId = settingsTargetId,
-        mode = app.prefs.mode,
-        intervalSec = app.prefs.intervalSec,
-        speedLimitKmh = app.prefs.speedLimitKmh,
-        guardArmed = app.prefs.parkingArmed,
-        autoArm = app.prefs.autoArm,
-        sirenOnAlert = app.prefs.sirenOnAlert,
-        sosSms = app.prefs.sosSms,
-        crashEnabled = app.prefs.crashDetection,
-        sosNumber = app.prefs.emergencyNumber,
-        serviceKm = app.prefs.serviceIntervalKm,
-        guardScheduleStart = app.prefs.guardScheduleStart.takeIf { it in 0..23 },
-        guardScheduleEnd = app.prefs.guardScheduleEnd.takeIf { it in 0..23 },
-    )
-
     /** Sends a one-off command (e.g. mark_serviced) to the bike from the Remote phone. */
     fun sendRemoteCommand(type: String, arg: String? = null) {
         viewModelScope.launch {
@@ -145,12 +129,34 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Pushes this phone's settings to the server. Call after any Remote settings change. */
-    fun pushSettings() {
+    /** Pushes exactly the fields the user just changed (v1.2.17). The old
+     *  whole-row push rebuilt the server row from this phone's local Prefs,
+     *  so a change tapped before loadRemoteSettings() finished overwrote
+     *  values this phone had never seen with wiped defaults. Each call site
+     *  passes only its own field; everything else on the server is untouched. */
+    fun pushSettingsPatch(
+        mode: String? = null,
+        intervalSec: Int? = null,
+        speedLimitKmh: Int? = null,
+        autoArm: Boolean? = null,
+        sirenOnAlert: Boolean? = null,
+        sosSms: Boolean? = null,
+        crashEnabled: Boolean? = null,
+        sosNumber: String? = null,
+        serviceKm: Int? = null,
+        guardScheduleStart: Int? = null,
+        guardScheduleEnd: Int? = null,
+        clearScheduleStart: Boolean = false,
+        clearScheduleEnd: Boolean = false,
+    ) {
         if (app.prefs.appRole != ROLE_REMOTE) return
         viewModelScope.launch {
             settingsNote = null
-            if (app.api.saveDeviceSettings(settingsFromPrefs(), touchUpdated = true)) {
+            if (app.api.patchDeviceSettings(
+                    settingsTargetId, mode, intervalSec, speedLimitKmh, autoArm,
+                    sirenOnAlert, sosSms, crashEnabled, sosNumber, serviceKm,
+                    guardScheduleStart, guardScheduleEnd, clearScheduleStart, clearScheduleEnd,
+                )) {
                 settingsApplied = false // applied once the tracker polls and confirms
             } else {
                 settingsNote = app.getString(R.string.cmd_failed)
@@ -176,8 +182,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val s = try { app.api.getDeviceSettings(settingsTargetId) } catch (e: Exception) { null }
             if (s == null) { settingsApplied = null; return@launch }
             remoteSettings = s
-            // Mirror the server row locally: a later push must not wipe a value this phone never saw
-            // (for example, clearing a guard schedule the Remote phone did not know about).
+            // Mirror the server row locally, so the screen shows the server's values.
+            // Pushes are field-scoped now (pushSettingsPatch), so the mirror is only
+            // for display — a later push cannot wipe a value this phone never saw.
             mode = s.mode; app.prefs.mode = s.mode
             intervalSec = s.intervalSec; app.prefs.intervalSec = s.intervalSec
             app.prefs.speedLimitKmh = s.speedLimitKmh
@@ -199,7 +206,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun updateMode(m: String) {
         mode = m
         app.prefs.mode = m
-        pushSettings()
+        pushSettingsPatch(mode = m)
         if (app.prefs.isRemote) return // the Remote phone never tracks; the mode is for the bike
         // Leaving Always-on: keep the current run going, but it is user/auto-controlled from now on.
         if (m == MODE_ALWAYS) app.tryStartTracking() else app.prefs.trackingActive = TrackerState.running.value
@@ -209,7 +216,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun setInterval(sec: Int) {
         intervalSec = sec
         app.prefs.intervalSec = sec
-        pushSettings()
+        pushSettingsPatch(intervalSec = sec)
         if (app.prefs.isRemote) return
         if (TrackerState.running.value) app.tryStartTracking() // re-applies the new interval
     }
