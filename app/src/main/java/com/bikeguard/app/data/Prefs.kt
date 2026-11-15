@@ -49,6 +49,11 @@ class Prefs(private val context: Context) {
         get() = sp.getString("email", null)
         set(v) = sp.edit { putString("email", v) }
 
+    /** DownloadManager id of the in-app update download (v1.2.30); 0 = none. */
+    var updateDownloadId: Long
+        get() = sp.getLong("update_dl_id", 0L)
+        set(v) = sp.edit { putLong("update_dl_id", v) }
+
     /** Hardware-stable key for this phone: Settings.Secure.ANDROID_ID. Unlike the random
      *  device id below it survives an uninstall and an app-data clear (same app, same
      *  phone, same signing key), so after a reinstall the phone can find its old server

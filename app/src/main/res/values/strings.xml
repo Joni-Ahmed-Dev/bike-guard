@@ -374,7 +374,8 @@
     <string name="update_latest">You are on the latest version.</string>
     <string name="update_failed">Could not check for updates. Check your connection and try again.</string>
     <string name="update_available_title">Version %1$s is available</string>
-    <string name="update_available_body">A newer BikeGuard release is available on GitHub. Download the APK from the release page and install it over this version.</string>
+    <string name="update_available_body">A newer BikeGuard release is available. It downloads inside the app, then asks you to install it over this version.</string>
     <string name="update_download">Download</string>
+    <string name="update_downloading">Downloading update…</string>
     <string name="update_later">Later</string>
 </resources>

@@ -123,7 +123,7 @@ private fun HomeScreen(vm: AppViewModel, alerts: AlertsViewModel = viewModel()) 
             title = { Text(stringResource(R.string.update_available_title, update.version)) },
             text = { Text(stringResource(R.string.update_available_body)) },
             confirmButton = {
-                TextButton(onClick = { openWebPage(ctx, update.url); vm.dismissUpdate() }) {
+                TextButton(onClick = { vm.startUpdateDownload(ctx) }) {
                     Text(stringResource(R.string.update_download))
                 }
             },

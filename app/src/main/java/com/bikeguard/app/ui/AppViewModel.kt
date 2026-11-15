@@ -1,6 +1,7 @@
 package com.bikeguard.app.ui
 
 import android.app.Application
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -25,6 +26,7 @@ import com.bikeguard.app.tracker.TrackerState
 import com.bikeguard.app.tracker.TrackingControl
 import com.bikeguard.app.tracker.TrackingService
 import com.bikeguard.app.tracker.tryStartTracking
+import com.bikeguard.app.update.ApkUpdater
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -81,6 +83,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun dismissUpdate() { updateAvailable = null }
+
+    /** Download the available update inside the app (v1.2.30). Falls back
+     *  to the release page when the release has no APK to download. */
+    fun startUpdateDownload(ctx: Context) {
+        val info = updateAvailable ?: return
+        if (!ApkUpdater.startDownload(ctx, info)) openWebPage(ctx, info.url)
+        dismissUpdate()
+    }
 
     fun submit(email: String, password: String, signUp: Boolean) {
         if (busy) return
