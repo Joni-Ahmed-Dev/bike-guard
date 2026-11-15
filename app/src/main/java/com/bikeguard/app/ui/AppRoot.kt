@@ -9,12 +9,12 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.Dashboard as DashboardOutlined
-import androidx.compose.material.icons.outlined.GpsFixed as GpsFixedOutlined
-import androidx.compose.material.icons.outlined.History as HistoryOutlined
-import androidx.compose.material.icons.outlined.Map as MapOutlined
-import androidx.compose.material.icons.outlined.Receipt as ReceiptOutlined
-import androidx.compose.material.icons.outlined.Settings as SettingsOutlined
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.GpsFixed
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Receipt
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -91,15 +91,15 @@ private fun HomeScreen(vm: AppViewModel, alerts: AlertsViewModel = viewModel()) 
     // Tabs by role: the tracker phone only tracks; the Remote phone controls everything.
     val tabs = when {
         vm.role == com.bikeguard.app.data.ROLE_TRACKER -> listOf(
-            TabItem("tracker", R.string.tab_tracker, Icons.Default.GpsFixed, GpsFixedOutlined),
-            TabItem("settings", R.string.tab_settings, Icons.Default.Settings, SettingsOutlined),
+            TabItem("tracker", R.string.tab_tracker, Icons.Default.GpsFixed, Icons.Outlined.GpsFixed),
+            TabItem("settings", R.string.tab_settings, Icons.Default.Settings, Icons.Outlined.Settings),
         )
         else -> listOf(
-            TabItem("dashboard", R.string.tab_dashboard, Icons.Default.Dashboard, DashboardOutlined),
-            TabItem("viewer", R.string.tab_viewer, Icons.Default.Map, MapOutlined),
-            TabItem("trips", R.string.tab_trips, Icons.Default.History, HistoryOutlined),
-            TabItem("expenses", R.string.tab_expenses, Icons.Default.Receipt, ReceiptOutlined),
-            TabItem("settings", R.string.tab_settings, Icons.Default.Settings, SettingsOutlined),
+            TabItem("dashboard", R.string.tab_dashboard, Icons.Default.Dashboard, Icons.Outlined.Dashboard),
+            TabItem("viewer", R.string.tab_viewer, Icons.Default.Map, Icons.Outlined.Map),
+            TabItem("trips", R.string.tab_trips, Icons.Default.History, Icons.Outlined.History),
+            TabItem("expenses", R.string.tab_expenses, Icons.Default.Receipt, Icons.Outlined.Receipt),
+            TabItem("settings", R.string.tab_settings, Icons.Default.Settings, Icons.Outlined.Settings),
         )
     }
     var tab by rememberSaveable { mutableIntStateOf(0) }
