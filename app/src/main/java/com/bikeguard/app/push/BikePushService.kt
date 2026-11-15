@@ -16,7 +16,10 @@ import kotlinx.coroutines.launch
 class BikePushService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         val app = bikeApp
-        if (app.prefs.isLoggedIn) app.appScope.launch { app.api.registerPushToken(token, app.prefs.deviceId) }
+        if (app.prefs.isLoggedIn) app.appScope.launch {
+            app.api.registerPushToken(token, app.prefs.deviceId)
+            PushRegistrar.registerWithPushWorker(token, app.prefs.deviceId, app.prefs.userId)
+        }
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
