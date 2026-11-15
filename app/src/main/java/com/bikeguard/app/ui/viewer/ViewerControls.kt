@@ -95,7 +95,7 @@ fun ViewerControls(vm: ViewerViewModel) {
         // toggle lives on the tab that draws the line.
         SwitchRow(
             stringResource(R.string.route_line_title), stringResource(R.string.route_line_desc),
-            vm.showRouteLine, onChange = { vm.setShowRouteLine(it) }, icon = Icons.Default.AltRoute,
+            vm.showRouteLine, onChange = { vm.updateRouteLine(it) }, icon = Icons.Default.AltRoute,
         )
         vm.commandNote?.let { Text(stringResource(it), color = Palette.Muted, style = MaterialTheme.typography.labelMedium) }
     }

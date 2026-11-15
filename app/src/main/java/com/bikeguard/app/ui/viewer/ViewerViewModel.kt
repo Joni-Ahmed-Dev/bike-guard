@@ -48,7 +48,7 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
     /** This phone's route-line display preference, re-read whenever the screen comes forward. */
     var showRouteLine by mutableStateOf(app.prefs.showRouteLine); private set
     /** Route-line toggle, now on the Viewer tab itself (v1.2.35): writes the same pref Settings used to own. */
-    fun setShowRouteLine(on: Boolean) {
+    fun updateRouteLine(on: Boolean) {
         app.prefs.showRouteLine = on
         showRouteLine = on
     }
