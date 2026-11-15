@@ -346,4 +346,26 @@
     <string name="diag_gps">GPS</string>
     <string name="diag_gps_on">On</string>
     <string name="diag_gps_off">Off</string>
+
+    <!-- Appearance: language + theme (v1.2.20) -->
+    <string name="appearance_title">Language &amp; theme</string>
+    <string name="lang_title">Language</string>
+    <string name="lang_system">System</string>
+    <string name="lang_english">English</string>
+    <string name="lang_bengali">বাংলা</string>
+    <string name="theme_title">Theme</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_system">System</string>
+
+    <!-- Last seen before a command (v1.2.20) -->
+    <string name="ctl_last_seen">Bike last seen %1$s ago</string>
+    <string name="ctl_last_seen_none">Bike location unknown</string>
+
+    <!-- Role PIN recovery by re-auth (v1.2.20) -->
+    <string name="pin_forgot">Forgot PIN?</string>
+    <string name="pin_reset_title">Reset role PIN</string>
+    <string name="pin_reset_hint">Enter your account password. The role PIN is cleared and you pick a new role and PIN.</string>
+    <string name="pin_reset_wrong">Wrong password</string>
+    <string name="pin_reset">Reset PIN</string>
 </resources>

@@ -21,6 +21,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bikeguard.app.R
@@ -31,12 +34,6 @@ import com.bikeguard.app.ui.fmtKm
 import com.bikeguard.app.ui.fmtTime
 import com.bikeguard.app.ui.theme.Palette
 import com.bikeguard.app.ui.theme.Panel
-
-private fun shareText(ctx: android.content.Context, text: String) {
-    val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
-        .putExtra(android.content.Intent.EXTRA_TEXT, text)
-    ctx.startActivity(android.content.Intent.createChooser(send, null))
-}
 
 @Composable
 fun TripsScreen(modifier: Modifier = Modifier, vm: TripsViewModel = viewModel()) {
@@ -64,6 +61,7 @@ private fun TripList(modifier: Modifier, vm: TripsViewModel) {
                 items(vm.devices, key = { it.id.orEmpty() }) { d ->
                     FilterChip(
                         selected = d.id == vm.selectedId, onClick = { d.id?.let(vm::select) }, label = { Text(d.name) },
+                        modifier = Modifier.height(48.dp),
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = Palette.Ember, selectedLabelColor = Palette.Ink,
                         ),
@@ -98,12 +96,12 @@ private fun TripList(modifier: Modifier, vm: TripsViewModel) {
                             )
                             Spacer(Modifier.height(10.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(onClick = { shareText(ctx, vm.weeklyCsv()) }) {
+                                OutlinedButton(onClick = { shareFile(ctx, vm.weeklyCsv(), "bikeguard-week.csv", "text/csv") }) {
                                     Text(stringResource(R.string.export_csv))
                                 }
                                 OutlinedButton(onClick = {
                                     vm.exportLatestTripGpx { gpx ->
-                                        if (gpx != null) shareText(ctx, gpx)
+                                        if (gpx != null) shareFile(ctx, gpx, "bikeguard-trip.gpx", "application/gpx+xml")
                                         else Toast.makeText(ctx, ctx.getString(R.string.export_failed), Toast.LENGTH_SHORT).show()
                                     }
                                 }) { Text(stringResource(R.string.export_gpx)) }
@@ -119,7 +117,10 @@ private fun TripList(modifier: Modifier, vm: TripsViewModel) {
 
 @Composable
 private fun TripCard(ctx: android.content.Context, trip: TripDto, onClick: () -> Unit) {
-    Panel(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).clickable(onClick = onClick)) {
+    // Merged descendants + Button role (v1.2.20): TalkBack used to land on the
+    // bare Panel with no label; now it announces the trip card.
+    Panel(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).clickable(onClick = onClick)
+        .semantics(mergeDescendants = true) { role = Role.Button }) {
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(fmtDate(trip.startedMs), style = MaterialTheme.typography.titleMedium)

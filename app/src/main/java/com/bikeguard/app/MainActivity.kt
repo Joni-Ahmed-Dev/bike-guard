@@ -1,8 +1,11 @@
 package com.bikeguard.app
 
+import android.content.Context
+import android.graphics.Color
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.WindowManager
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
@@ -17,16 +20,34 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.bikeguard.app.ui.AppRoot
+import com.bikeguard.app.ui.LocaleHelper
 import com.bikeguard.app.ui.LockScreen
 import com.bikeguard.app.ui.theme.BikeGuardTheme
+import com.bikeguard.app.ui.theme.Palette
+import com.bikeguard.app.ui.theme.isLightMode
 
 class MainActivity : FragmentActivity() {
     private var locked by mutableStateOf(false)
     private var prompting = false
     private var stoppedAt = 0L
 
+    override fun attachBaseContext(newBase: Context) {
+        // In-app language (v1.2.20): wrap before anything reads resources.
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
+        // Theme first: the palette must already match before the first composition,
+        // and the system bars need the matching style or light-theme content runs
+        // under dark icons (and vice versa) on Android 15 edge-to-edge.
+        val light = isLightMode(this)
+        Palette.isLight = light
+        val barStyle = if (light) SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+        else SystemBarStyle.dark(Color.TRANSPARENT, Color.TRANSPARENT)
+        enableEdgeToEdge(statusBarStyle = barStyle, navigationBarStyle = barStyle)
+        // The theme's window background is the dark ink; on light theme the cold
+        // start would flash dark behind the first frame without this.
+        window.setBackgroundDrawableResource(if (light) R.color.bg_light else R.color.bg)
         super.onCreate(savedInstanceState)
         locked = bikeApp.prefs.appLock && bikeApp.prefs.isLoggedIn
         setContent {

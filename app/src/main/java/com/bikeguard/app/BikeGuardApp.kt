@@ -1,6 +1,7 @@
 package com.bikeguard.app
 
 import android.app.Application
+import android.content.Context
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -23,6 +24,7 @@ import com.bikeguard.app.data.MODE_AUTO
 import com.bikeguard.app.tracker.AutoMode
 import com.bikeguard.app.tracker.TrackingService
 import com.bikeguard.app.tracker.WatchdogWorker
+import com.bikeguard.app.ui.LocaleHelper
 import java.util.concurrent.TimeUnit
 
 class BikeGuardApp : Application() {
@@ -35,6 +37,12 @@ class BikeGuardApp : Application() {
 
     /** Outlives screens and the tracking service: used for uploads, alerts and the SOS countdown. */
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override fun attachBaseContext(base: Context) {
+        // In-app language (v1.2.20): app-level resources (toasts, notifications)
+        // must use the chosen language, not just the activity's.
+        super.attachBaseContext(LocaleHelper.wrap(base))
+    }
 
     override fun onCreate() {
         super.onCreate()

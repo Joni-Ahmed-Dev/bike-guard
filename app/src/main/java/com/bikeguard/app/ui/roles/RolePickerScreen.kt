@@ -17,6 +17,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -96,7 +99,10 @@ private fun RoleCard(
         shape = shape,
         color = if (selected) Palette.Ember.copy(alpha = 0.16f) else Palette.Card,
         border = BorderStroke(1.dp, if (selected) Palette.Ember else Palette.Stroke),
-        modifier = Modifier.fillMaxWidth().clip(shape).clickable(onClick = onClick),
+        // Merged descendants + Button role (v1.2.20): TalkBack used to land on the
+        // bare Surface with no label; now it announces the role card.
+        modifier = Modifier.fillMaxWidth().clip(shape).clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) { role = Role.Button },
     ) {
         Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = Palette.Ember, modifier = Modifier.size(32.dp))

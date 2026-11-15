@@ -37,6 +37,17 @@
             </intent-filter>
         </activity>
 
+        <!-- FileProvider for trip exports (v1.2.20): GPX/CSV are shared as real files, not pasted text. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <service
             android:name=".tracker.TrackingService"
             android:exported="false"

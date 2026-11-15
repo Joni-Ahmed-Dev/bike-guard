@@ -346,4 +346,26 @@
     <string name="diag_gps">জিপিএস</string>
     <string name="diag_gps_on">চালু</string>
     <string name="diag_gps_off">বন্ধ</string>
+
+    <!-- Appearance: language + theme (v1.2.20) -->
+    <string name="appearance_title">ভাষা ও থিম</string>
+    <string name="lang_title">ভাষা</string>
+    <string name="lang_system">সিস্টেম</string>
+    <string name="lang_english">English</string>
+    <string name="lang_bengali">বাংলা</string>
+    <string name="theme_title">থিম</string>
+    <string name="theme_dark">গাঢ়</string>
+    <string name="theme_light">হালকা</string>
+    <string name="theme_system">সিস্টেম</string>
+
+    <!-- Last seen before a command (v1.2.20) -->
+    <string name="ctl_last_seen">বাইকের শেষ অবস্থান %1$s আগে</string>
+    <string name="ctl_last_seen_none">বাইকের অবস্থান জানা নেই</string>
+
+    <!-- Role PIN recovery by re-auth (v1.2.20) -->
+    <string name="pin_forgot">পিন ভুলে গেছো?</string>
+    <string name="pin_reset_title">রোলের পিন রিসেট</string>
+    <string name="pin_reset_hint">অ্যাকাউন্টের পাসওয়ার্ড দাও। রোলের পিন মুছে যাবে, আর নতুন রোল ও পিন বেছে নিতে হবে।</string>
+    <string name="pin_reset_wrong">ভুল পাসওয়ার্ড</string>
+    <string name="pin_reset">পিন রিসেট করো</string>
 </resources>

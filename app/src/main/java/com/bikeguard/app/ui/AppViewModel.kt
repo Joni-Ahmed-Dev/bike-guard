@@ -120,6 +120,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         return true
     }
 
+    /**
+     * PIN recovery (v1.2.20): the role PIN used to be recoverable only by clearing
+     * app data, which also signed the owner out. Re-authenticating with the
+     * account password clears the role and PIN, and the picker then asks for a
+     * new role and PIN. The session is untouched: signIn refreshes the same
+     * account's tokens. False when there is no stored email or the password is
+     * wrong; a failed sign-in changes nothing.
+     */
+    fun resetRolePin(password: String, onResult: (Boolean) -> Unit) {
+        val email = app.prefs.email.orEmpty()
+        if (email.isBlank()) { onResult(false); return }
+        viewModelScope.launch {
+            val ok = app.api.signIn(email, password) is AuthResult.Success
+            if (ok) {
+                app.prefs.rolePin = ""
+                app.prefs.appRole = ""
+                role = ""
+            }
+            onResult(ok)
+        }
+    }
+
     // ---------- server-synced settings (Remote edits, tracker applies) ----------
 
     /** Sends a one-off command (e.g. mark_serviced) to the bike from the Remote phone. */

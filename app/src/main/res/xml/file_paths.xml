@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Export files (v1.2.20): GPX/CSV exports are written to the cache dir and shared as real files, so a large export is never truncated the way a plain-text share is. -->
+<paths>
+    <cache-path name="exports" path="exports/" />
+</paths>

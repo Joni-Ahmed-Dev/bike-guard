@@ -29,9 +29,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.bikeguard.app.R
+import com.bikeguard.app.data.isoToMs
+import com.bikeguard.app.ui.agoText
 import com.bikeguard.app.ui.fmtHourMin
+import com.bikeguard.app.ui.rememberNow
 import com.bikeguard.app.ui.theme.Palette
 import java.time.Instant
 
@@ -43,8 +49,18 @@ fun ViewerControls(vm: ViewerViewModel) {
     var showLimit by remember { mutableStateOf(false) }
     var showSos by remember { mutableStateOf(false) }
     val armed = vm.selectedDevice?.armed == true
+    val ctx = LocalContext.current
+    val now = rememberNow()
+    // Last seen before any command (v1.2.20): the owner must know whether the
+    // bike's position is fresh or hours old before sending a command that acts
+    // on it. Falls back to the device row's last_seen when no fix is loaded.
+    val lastSeenMs = vm.latest?.recordedAtMs
+        ?: vm.selectedDevice?.lastSeen?.let { isoToMs(it) } ?: 0L
+    val lastSeenText = if (lastSeenMs > 0) stringResource(R.string.ctl_last_seen, agoText(ctx, lastSeenMs, now))
+    else stringResource(R.string.ctl_last_seen_none)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(lastSeenText, color = Palette.Muted, style = MaterialTheme.typography.labelMedium)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ControlButton(Icons.Default.MyLocation, R.string.ctl_locate, Modifier.weight(1f)) { vm.send("locate") }
             ControlButton(Icons.Default.Bolt, R.string.ctl_live, Modifier.weight(1f)) { vm.send("live") }
@@ -77,7 +93,13 @@ fun ViewerControls(vm: ViewerViewModel) {
         onDismissRequest = { showSos = false },
         containerColor = Palette.Surface,
         title = { Text(stringResource(R.string.sos_remote_title)) },
-        text = { Text(stringResource(R.string.sos_remote_text), color = Palette.Muted) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(stringResource(R.string.sos_remote_text), color = Palette.Muted)
+                // The SOS goes to the bike's last known position: say how old it is.
+                Text(lastSeenText, color = Palette.Muted, style = MaterialTheme.typography.labelMedium)
+            }
+        },
         confirmButton = {
             Button(onClick = { showSos = false; vm.send("sos") }) { Text(stringResource(R.string.sos_remote_send)) }
         },
@@ -96,7 +118,10 @@ private fun ControlButton(icon: ImageVector, label: Int, modifier: Modifier, tin
     val shape = RoundedCornerShape(16.dp)
     Surface(
         shape = shape, color = Palette.Card, border = BorderStroke(1.dp, Palette.Stroke),
-        modifier = modifier.clip(shape).clickable(onClick = onClick),
+        // Merged descendants + Button role (v1.2.20): TalkBack used to land on the
+        // bare Surface with no label; now it announces the button's label.
+        modifier = modifier.clip(shape).clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) { role = Role.Button },
     ) {
         Column(Modifier.padding(vertical = 12.dp, horizontal = 4.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
@@ -180,6 +205,7 @@ private fun LimitDialog(vm: ViewerViewModel, onClose: () -> Unit) {
                         selected = v == current,
                         onClick = { vm.send("set_speed_limit", v.toString()); onClose() },
                         label = { Text(if (v == 0) stringResource(R.string.limit_off) else stringResource(R.string.limit_kmh, v)) },
+                        modifier = Modifier.height(48.dp),
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = Palette.Ember.copy(alpha = 0.2f), selectedLabelColor = Palette.Ember,
                         ),
@@ -221,6 +247,7 @@ private fun GeofenceDialog(vm: ViewerViewModel, onClose: () -> Unit) {
                     listOf(100, 200, 500).forEach { r ->
                         FilterChip(
                             selected = radius == r, onClick = { radius = r }, label = { Text(stringResource(R.string.geo_radius, r)) },
+                            modifier = Modifier.height(48.dp),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Palette.Ember.copy(alpha = 0.2f), selectedLabelColor = Palette.Ember,
                             ),

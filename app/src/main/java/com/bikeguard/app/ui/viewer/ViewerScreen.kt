@@ -55,10 +55,17 @@ private val PEEK = 168.dp
 // stable from the first layout, independent of content and of the expanded flag below.
 private const val SHEET_EXPANDED_FRACTION = 0.92f
 
-private enum class Status(val label: Int, val color: Color) {
-    LIVE(R.string.status_live, Palette.Signal),
-    DELAYED(R.string.status_delayed, Palette.Ember),
-    OFFLINE(R.string.status_offline, Palette.Muted),
+private enum class Status(val label: Int) {
+    LIVE(R.string.status_live),
+    DELAYED(R.string.status_delayed),
+    OFFLINE(R.string.status_offline),
+}
+
+/** Resolved at composition time (v1.2.20): the old enum stored Palette colors at class-load time, so a theme flip after the process started kept the dark colors. */
+private fun statusColor(status: Status): Color = when (status) {
+    Status.LIVE -> Palette.Signal
+    Status.DELAYED -> Palette.Ember
+    Status.OFFLINE -> Palette.Muted
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -144,6 +151,7 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
                                 selected = d.id == vm.selectedId,
                                 onClick = { d.id?.let(vm::select) },
                                 label = { Text(d.name) },
+                                modifier = Modifier.height(48.dp),
                                 colors = FilterChipDefaults.filterChipColors(
                                     containerColor = Palette.Surface.copy(alpha = 0.9f), labelColor = Palette.Text,
                                     selectedContainerColor = Palette.Ember, selectedLabelColor = Palette.Ink,
@@ -168,6 +176,7 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
                         selected = false,
                         onClick = { OfflineMap.downloadAround(ctx, latest.lat, latest.lng) { offlineMsg = it } },
                         label = { Text(stringResource(R.string.offline_map)) },
+                        modifier = Modifier.height(48.dp),
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = Palette.Surface.copy(alpha = 0.9f), labelColor = Palette.Text,
                         ),
@@ -183,7 +192,9 @@ fun ViewerScreen(modifier: Modifier = Modifier, vm: ViewerViewModel = viewModel(
                 }
             }
 
-            SmallFloatingActionButton(
+            // Recenter: a full-size FAB (56dp), not the small 40dp one — the map's
+            // only control must meet the 48dp touch target (v1.2.20).
+            FloatingActionButton(
                 onClick = { follow = true },
                 containerColor = Palette.Surface, contentColor = if (follow) Palette.Ember else Palette.Muted,
                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = PEEK + 16.dp),
@@ -232,9 +243,9 @@ private fun SheetContent(
                 // so the whole sheet is reachable even if a drag is swallowed.
                 Row(Modifier.fillMaxWidth().clickable(onClick = onToggleSheet), verticalAlignment = Alignment.CenterVertically) {
                     Text(deviceName, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                    Box(Modifier.size(8.dp).background(status.color, CircleShape))
+                    Box(Modifier.size(8.dp).background(statusColor(status), CircleShape))
                     Spacer(Modifier.width(6.dp))
-                    Text(stringResource(status.label), color = status.color, style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(status.label), color = statusColor(status), style = MaterialTheme.typography.labelMedium)
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.Bottom) {

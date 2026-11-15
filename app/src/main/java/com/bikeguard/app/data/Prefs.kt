@@ -16,6 +16,13 @@ const val MODE_AUTO = "auto"
 const val ROLE_TRACKER = "tracker"
 const val ROLE_REMOTE = "remote"
 
+/** In-app language (v1.2.20): "" = system, "en" = English, "bn" = Bengali. */
+const val LANG_SYSTEM = ""
+/** Theme (v1.2.20): "dark" is the default, as before; "light" is the sunlight option; "system" follows the phone. */
+const val THEME_DARK = "dark"
+const val THEME_LIGHT = "light"
+const val THEME_SYSTEM = "system"
+
 /** Tokens and settings. Encrypted with the Android Keystore; falls back to plain prefs only if the Keystore is broken. */
 class Prefs(private val context: Context) {
     private val sp: SharedPreferences = try {
@@ -145,6 +152,19 @@ class Prefs(private val context: Context) {
     var appLock: Boolean
         get() = sp.getBoolean("app_lock", false)
         set(v) = sp.edit { putBoolean("app_lock", v) }
+
+    /** In-app language (v1.2.20): "" = system, "en" = English, "bn" = Bengali.
+     *  Applied in attachBaseContext via LocaleHelper; changing it recreates
+     *  the activity, so the whole UI switches without a reinstall. */
+    var language: String
+        get() = sp.getString("language", LANG_SYSTEM) ?: LANG_SYSTEM
+        set(v) = sp.edit { putString("language", v) }
+    /** Theme (v1.2.20): THEME_DARK (the default, as before), THEME_LIGHT for
+     *  sunlight, THEME_SYSTEM to follow the phone. Changing it recreates the
+     *  activity, so the status-bar style and window background follow too. */
+    var themeMode: String
+        get() = sp.getString("theme_mode", THEME_DARK) ?: THEME_DARK
+        set(v) = sp.edit { putString("theme_mode", v) }
 
     // ---- odometer and service reminder ----
     var odometerKm: Float
