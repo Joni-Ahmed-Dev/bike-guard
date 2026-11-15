@@ -465,7 +465,8 @@ class SupabaseApi(private val prefs: Prefs) {
         guardScheduleEnd: Int? = null,
         clearScheduleStart: Boolean = false,
         clearScheduleEnd: Boolean = false,
-    ): Boolean = try {
+    ): Boolean {
+        return try {
         val hasChange = mode != null || intervalSec != null || speedLimitKmh != null ||
             autoArm != null || sirenOnAlert != null || sosSms != null || crashEnabled != null ||
             sosNumber != null || serviceKm != null || guardScheduleStart != null ||
@@ -494,6 +495,7 @@ class SupabaseApi(private val prefs: Prefs) {
                 .post(payload.toRequestBody(jsonType)).build()
         }.ok
     } catch (e: IOException) { false }
+    }
 
     /** The tracker calls this after it has applied the Remote phone's settings. */
     suspend fun markSettingsApplied(deviceId: String): Boolean = try {
