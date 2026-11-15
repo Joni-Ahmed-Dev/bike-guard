@@ -121,7 +121,7 @@ data class ExpenseRecord(
     fun toDto() = ExpenseDto(
         id = serverId, category = category, amount = amount,
         note = note.ifBlank { null },
-        spentOn = LocalDate.ofInstant(Instant.ofEpochMilli(spentOn), ZoneId.systemDefault()).toString(),
+        spentOn = Instant.ofEpochMilli(spentOn).atZone(ZoneId.systemDefault()).toLocalDate().toString(),
     )
 }
 

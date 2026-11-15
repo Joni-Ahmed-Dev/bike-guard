@@ -31,4 +31,10 @@ on conflict (id) do nothing;
 create or replace function auth.uid() returns uuid
 language sql stable as $$ select '22222222-2222-2222-2222-222222222222'::uuid $$;
 
-create publication if not exists supabase_realtime;
+-- CREATE PUBLICATION has no IF NOT EXISTS clause, so guard it explicitly.
+do $$
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    create publication supabase_realtime;
+  end if;
+end $$;
