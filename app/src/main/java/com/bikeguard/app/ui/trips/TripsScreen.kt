@@ -7,23 +7,34 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AltRoute
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bikeguard.app.R
@@ -59,11 +70,15 @@ private fun TripList(modifier: Modifier, vm: TripsViewModel) {
         if (vm.devices.size > 1) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 12.dp)) {
                 items(vm.devices, key = { it.id.orEmpty() }) { d ->
+                    // Same chip pattern as the Viewer round: mint when selected,
+                    // white with a thin border otherwise, dark text both ways.
                     FilterChip(
                         selected = d.id == vm.selectedId, onClick = { d.id?.let(vm::select) }, label = { Text(d.name) },
                         modifier = Modifier.height(48.dp),
+                        shape = RoundedCornerShape(50),
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Palette.Ember, selectedLabelColor = Palette.Ink,
+                            containerColor = Palette.Surface.copy(alpha = 0.9f), labelColor = Palette.Text,
+                            selectedContainerColor = Palette.Ember, selectedLabelColor = Palette.Text,
                         ),
                     )
                 }
@@ -85,26 +100,53 @@ private fun TripList(modifier: Modifier, vm: TripsViewModel) {
                 item {
                     vm.weeklySummary?.let { w ->
                         Panel(Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.weekly_title), style = MaterialTheme.typography.titleMedium)
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                "${stringResource(R.string.weekly_trips, w.trips)}  ·  " +
-                                    ctx.getString(R.string.unit_km, w.km) + "  ·  " +
-                                    fmtDuration(ctx, w.minutes * 60_000L) + "  ·  " +
-                                    stringResource(R.string.trip_max, w.topSpeed.toInt()),
-                                color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
-                            )
-                            Spacer(Modifier.height(10.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(onClick = { shareFile(ctx, vm.weeklyCsv(), "bikeguard-week.csv", "text/csv") }) {
-                                    Text(stringResource(R.string.export_csv))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                AccentCircle(Icons.Default.DateRange)
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        stringResource(R.string.weekly_title),
+                                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                                    )
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        "${stringResource(R.string.weekly_trips, w.trips)}  ·  " +
+                                            ctx.getString(R.string.unit_km, w.km) + "  ·  " +
+                                            fmtDuration(ctx, w.minutes * 60_000L) + "  ·  " +
+                                            stringResource(R.string.trip_max, w.topSpeed.toInt()),
+                                        color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
+                                    )
                                 }
-                                OutlinedButton(onClick = {
-                                    vm.exportLatestTripGpx { gpx ->
-                                        if (gpx != null) shareFile(ctx, gpx, "bikeguard-trip.gpx", "application/gpx+xml")
-                                        else Toast.makeText(ctx, ctx.getString(R.string.export_failed), Toast.LENGTH_SHORT).show()
-                                    }
-                                }) { Text(stringResource(R.string.export_gpx)) }
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = { shareFile(ctx, vm.weeklyCsv(), "bikeguard-week.csv", "text/csv") },
+                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    shape = RoundedCornerShape(24.dp),
+                                    border = BorderStroke(1.dp, Palette.Leaf),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Palette.Leaf),
+                                ) {
+                                    Icon(Icons.Default.Download, null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(stringResource(R.string.export_csv), style = MaterialTheme.typography.labelMedium)
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        vm.exportLatestTripGpx { gpx ->
+                                            if (gpx != null) shareFile(ctx, gpx, "bikeguard-trip.gpx", "application/gpx+xml")
+                                            else Toast.makeText(ctx, ctx.getString(R.string.export_failed), Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    shape = RoundedCornerShape(24.dp),
+                                    border = BorderStroke(1.dp, Palette.Leaf),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Palette.Leaf),
+                                ) {
+                                    Icon(Icons.Default.Download, null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(stringResource(R.string.export_gpx), style = MaterialTheme.typography.labelMedium)
+                                }
                             }
                         }
                     }
@@ -121,20 +163,58 @@ private fun TripCard(ctx: android.content.Context, trip: TripDto, onClick: () ->
     // bare Panel with no label; now it announces the trip card.
     Panel(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).clickable(onClick = onClick)
         .semantics(mergeDescendants = true) { role = Role.Button }) {
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AccentCircle(Icons.Default.AltRoute)
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(fmtDate(trip.startedMs), style = MaterialTheme.typography.titleMedium)
+                Text(fmtDate(trip.startedMs), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(2.dp))
                 Text("${fmtTime(trip.startedMs)} – ${fmtTime(trip.endedMs)}", color = Palette.Muted, style = MaterialTheme.typography.labelMedium)
             }
-            Text(fmtKm(ctx, trip.distanceM), style = MaterialTheme.typography.titleLarge, color = Palette.Ember)
+            Spacer(Modifier.width(8.dp))
+            // Pale mint badge with the distance in bold Leaf, as in screenshot 5.
+            Box(
+                Modifier.background(Palette.Ember.copy(alpha = 0.18f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    fmtKm(ctx, trip.distanceM),
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Palette.Leaf,
+                )
+            }
         }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            val style = MaterialTheme.typography.labelMedium
-            Text(fmtDuration(ctx, trip.endedMs - trip.startedMs), color = Palette.Muted, style = style)
-            Text(stringResource(R.string.trip_avg, trip.avgSpeedKmh.toInt()), color = Palette.Muted, style = style)
-            Text(stringResource(R.string.trip_max, trip.maxSpeedKmh.toInt()), color = Palette.Muted, style = style)
+        HorizontalDivider(Modifier.padding(vertical = 12.dp), color = Palette.Stroke)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Stat(Icons.Default.Schedule, fmtDuration(ctx, trip.endedMs - trip.startedMs))
+            VerticalDivider(Modifier.height(20.dp), color = Palette.Stroke)
+            Stat(Icons.Default.Speed, stringResource(R.string.trip_avg, trip.avgSpeedKmh.toInt()))
+            VerticalDivider(Modifier.height(20.dp), color = Palette.Stroke)
+            Stat(Icons.Default.Speed, stringResource(R.string.trip_max, trip.maxSpeedKmh.toInt()))
         }
+    }
+}
+
+/** Small icon + muted text stat, as in the bottom row of a trip card. */
+@Composable
+private fun Stat(icon: ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Icon(icon, null, tint = Palette.Muted, modifier = Modifier.size(16.dp))
+        Text(text, color = Palette.Muted, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+    }
+}
+
+/**
+ * Pale mint circle with a Leaf icon — matches the calendar and route circles in
+ * screenshot 5. Dark keeps the Leaf convention (amber icon on translucent mint).
+ */
+@Composable
+private fun AccentCircle(icon: ImageVector) {
+    Box(
+        Modifier.size(48.dp).background(Palette.Ember.copy(alpha = 0.16f), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, null, tint = Palette.Leaf, modifier = Modifier.size(24.dp))
     }
 }
 
