@@ -2,7 +2,6 @@ package com.bikeguard.app.ui
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.GpsFixed
@@ -10,6 +9,12 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Dashboard as DashboardOutlined
+import androidx.compose.material.icons.outlined.GpsFixed as GpsFixedOutlined
+import androidx.compose.material.icons.outlined.History as HistoryOutlined
+import androidx.compose.material.icons.outlined.Map as MapOutlined
+import androidx.compose.material.icons.outlined.Receipt as ReceiptOutlined
+import androidx.compose.material.icons.outlined.Settings as SettingsOutlined
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -17,7 +22,6 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -78,7 +83,7 @@ fun AppRoot(vm: AppViewModel = viewModel()) {
     }
 }
 
-private data class TabItem(val id: String, val label: Int, val icon: ImageVector)
+private data class TabItem(val id: String, val label: Int, val icon: ImageVector, val iconOutlined: ImageVector)
 
 @Composable
 private fun HomeScreen(vm: AppViewModel, alerts: AlertsViewModel = viewModel()) {
@@ -87,15 +92,15 @@ private fun HomeScreen(vm: AppViewModel, alerts: AlertsViewModel = viewModel()) 
     // Tabs by role: the tracker phone only tracks; the Remote phone controls everything.
     val tabs = when {
         vm.role == com.bikeguard.app.data.ROLE_TRACKER -> listOf(
-            TabItem("tracker", R.string.tab_tracker, Icons.Default.GpsFixed),
-            TabItem("settings", R.string.tab_settings, Icons.Default.Settings),
+            TabItem("tracker", R.string.tab_tracker, Icons.Default.GpsFixed, GpsFixedOutlined),
+            TabItem("settings", R.string.tab_settings, Icons.Default.Settings, SettingsOutlined),
         )
         else -> listOf(
-            TabItem("dashboard", R.string.tab_dashboard, Icons.Default.Dashboard),
-            TabItem("viewer", R.string.tab_viewer, Icons.Default.Map),
-            TabItem("trips", R.string.tab_trips, Icons.Default.History),
-            TabItem("expenses", R.string.tab_expenses, Icons.Default.Receipt),
-            TabItem("settings", R.string.tab_settings, Icons.Default.Settings),
+            TabItem("dashboard", R.string.tab_dashboard, Icons.Default.Dashboard, DashboardOutlined),
+            TabItem("viewer", R.string.tab_viewer, Icons.Default.Map, MapOutlined),
+            TabItem("trips", R.string.tab_trips, Icons.Default.History, HistoryOutlined),
+            TabItem("expenses", R.string.tab_expenses, Icons.Default.Receipt, ReceiptOutlined),
+            TabItem("settings", R.string.tab_settings, Icons.Default.Settings, SettingsOutlined),
         )
     }
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -135,26 +140,30 @@ private fun HomeScreen(vm: AppViewModel, alerts: AlertsViewModel = viewModel()) 
     Scaffold(
         containerColor = Palette.Ink,
         bottomBar = {
-            Surface(
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
-                shape = RoundedCornerShape(28.dp),
-                color = Palette.Surface,
-                shadowElevation = 6.dp,
-            ) {
-                NavigationBar(containerColor = Color.Transparent) {
-                    tabs.forEachIndexed { index, item ->
-                        NavigationBarItem(
-                            selected = tab == index && !showAlerts,
-                            onClick = { tab = index; showAlerts = false },
-                            icon = { Icon(item.icon, contentDescription = null) },
-                            label = { Text(stringResource(item.label), maxLines = 1) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color(0xFF111111), selectedTextColor = Color(0xFF111111),
-                                indicatorColor = Color(0xFF91E9AD),
-                                unselectedIconColor = Palette.Muted, unselectedTextColor = Palette.Muted,
+            // Middle style from his reference (v1.2.36): a full-width bar, not
+            // the floating pill — five labels never fit inside the pill, so
+            // Dashboard and Expenses truncated to "Dashboa" / "Expense".
+            // Selected: filled Leaf icon + bold Leaf label, no pill behind it.
+            // Unselected: outlined muted icon + label.
+            NavigationBar(containerColor = Palette.Surface) {
+                tabs.forEachIndexed { index, item ->
+                    val selected = tab == index && !showAlerts
+                    NavigationBarItem(
+                        selected = selected,
+                        onClick = { tab = index; showAlerts = false },
+                        icon = { Icon(if (selected) item.icon else item.iconOutlined, contentDescription = null) },
+                        label = {
+                            Text(
+                                stringResource(item.label), maxLines = 1,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                             )
+                        },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Palette.Leaf, selectedTextColor = Palette.Leaf,
+                            indicatorColor = Color.Transparent,
+                            unselectedIconColor = Palette.Muted, unselectedTextColor = Palette.Muted,
                         )
-                    }
+                    )
                 }
             }
         }
