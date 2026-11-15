@@ -68,6 +68,7 @@ fun DashboardScreen(
     vm: ViewerViewModel = viewModel(),
     tripsVm: TripsViewModel = viewModel(),
     alerts: AlertsViewModel = viewModel(),
+    onAlertsClick: () -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val owner = LocalLifecycleOwner.current
@@ -142,13 +143,21 @@ fun DashboardScreen(
         modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Title row. The bell is VISUAL ONLY in this round: no onClick, no navigation.
+        // Title row. The bell opens Alerts (the Alerts tab left the bottom bar).
         Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 stringResource(R.string.tab_dashboard), style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.weight(1f),
             )
-            Icon(Icons.Default.Notifications, null, tint = Palette.Text, modifier = Modifier.size(26.dp))
+            IconButton(onClick = onAlertsClick) {
+                if (alerts.unread > 0) {
+                    BadgedBox(badge = { Badge { Text(alerts.unread.coerceAtMost(99).toString()) } }) {
+                        Icon(Icons.Default.Notifications, null, tint = Palette.Text, modifier = Modifier.size(26.dp))
+                    }
+                } else {
+                    Icon(Icons.Default.Notifications, null, tint = Palette.Text, modifier = Modifier.size(26.dp))
+                }
+            }
         }
 
         // ---- status + quick buttons ----

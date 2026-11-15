@@ -8,13 +8,10 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -97,12 +94,13 @@ private fun HomeScreen(vm: AppViewModel, alerts: AlertsViewModel = viewModel()) 
             TabItem("dashboard", R.string.tab_dashboard, Icons.Default.Dashboard),
             TabItem("viewer", R.string.tab_viewer, Icons.Default.Map),
             TabItem("trips", R.string.tab_trips, Icons.Default.History),
-            TabItem("alerts", R.string.tab_alerts, Icons.Default.Notifications),
             TabItem("expenses", R.string.tab_expenses, Icons.Default.Receipt),
             TabItem("settings", R.string.tab_settings, Icons.Default.Settings),
         )
     }
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    // Alerts left the bottom bar: it opens from the Dashboard bell instead.
+    var showAlerts by rememberSaveable { mutableStateOf(false) }
     val tabId = tabs.getOrNull(tab)?.id ?: tabs.first().id
 
     LaunchedEffect(Unit) {
@@ -146,17 +144,9 @@ private fun HomeScreen(vm: AppViewModel, alerts: AlertsViewModel = viewModel()) 
                 NavigationBar(containerColor = Color.Transparent) {
                     tabs.forEachIndexed { index, item ->
                         NavigationBarItem(
-                            selected = tab == index,
-                            onClick = { tab = index },
-                            icon = {
-                                if (item.id == "alerts" && alerts.unread > 0) {
-                                    BadgedBox(badge = { Badge { Text(alerts.unread.coerceAtMost(99).toString()) } }) {
-                                        Icon(item.icon, contentDescription = null)
-                                    }
-                                } else {
-                                    Icon(item.icon, contentDescription = null)
-                                }
-                            },
+                            selected = tab == index && !showAlerts,
+                            onClick = { tab = index; showAlerts = false },
+                            icon = { Icon(item.icon, contentDescription = null) },
                             label = { Text(stringResource(item.label), maxLines = 1) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = Color(0xFF111111), selectedTextColor = Color(0xFF111111),
@@ -170,12 +160,13 @@ private fun HomeScreen(vm: AppViewModel, alerts: AlertsViewModel = viewModel()) 
         }
     ) { inner ->
         val m = Modifier.padding(bottom = inner.calculateBottomPadding())
-        when (tabId) {
+        // Alerts left the bottom bar: it opens from the Dashboard bell instead.
+        if (showAlerts) AlertsScreen(m, alerts)
+        else when (tabId) {
             "tracker" -> TrackerScreen(vm, m)
-            "dashboard" -> DashboardScreen(m, alerts = alerts)
+            "dashboard" -> DashboardScreen(m, alerts = alerts, onAlertsClick = { showAlerts = true })
             "viewer" -> ViewerScreen(m)
             "trips" -> TripsScreen(m)
-            "alerts" -> AlertsScreen(m, alerts)
             "expenses" -> ExpensesScreen(m)
             else -> SettingsScreen(vm, m)
         }
