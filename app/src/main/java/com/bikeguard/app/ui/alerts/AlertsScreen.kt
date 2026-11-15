@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AirplanemodeActive
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.GpsOff
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Place
@@ -35,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -61,7 +63,7 @@ fun AlertsScreen(modifier: Modifier, vm: AlertsViewModel) {
     Column(modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
         Text(
             stringResource(R.string.tab_alerts), style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(top = 16.dp, bottom = 12.dp),
+            modifier = Modifier.padding(top = 16.dp, bottom = 16.dp),
         )
         if (vm.error) {
             // The load failed: say so and offer a retry, instead of pretending all is quiet.
@@ -79,7 +81,7 @@ fun AlertsScreen(modifier: Modifier, vm: AlertsViewModel) {
                 Text(stringResource(R.string.alerts_empty_body), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(vm.events, key = { it.id ?: it.createdAt.hashCode().toLong() }) { e ->
                     AlertRow(ctx, e, vm.deviceNames[e.deviceId].orEmpty(), now)
                 }
@@ -90,7 +92,14 @@ fun AlertsScreen(modifier: Modifier, vm: AlertsViewModel) {
 
 @Composable
 private fun AlertRow(ctx: Context, e: EventDto, deviceName: String, now: Long) {
-    val color = when (e.severity) { "critical" -> Palette.Danger; "warning" -> Palette.Ember; else -> Palette.Signal }
+    // Severity colors, kept true after the primary became mint (v1.2.23 pattern):
+    // critical stays red, warnings stay amber/peach, healthy stays green.
+    val color = when {
+        e.type == "health_ok" -> Palette.Leaf
+        e.severity == "critical" -> Palette.Danger
+        e.severity == "warning" -> Palette.Warn
+        else -> Palette.Signal
+    }
     val hasPlace = e.lat != null && e.lng != null
     Panel(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).clickable(enabled = hasPlace) {
@@ -103,17 +112,26 @@ private fun AlertRow(ctx: Context, e: EventDto, deviceName: String, now: Long) {
         }
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(40.dp).background(color.copy(alpha = 0.16f), CircleShape), contentAlignment = Alignment.Center) {
-                Icon(iconFor(e.type), null, tint = color, modifier = Modifier.size(22.dp))
+            // 48dp circle + 24dp icon, same row pattern as the Dashboard rows.
+            Box(Modifier.size(48.dp).background(color.copy(alpha = 0.16f), CircleShape), contentAlignment = Alignment.Center) {
+                Icon(iconFor(e.type), null, tint = color, modifier = Modifier.size(24.dp))
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(eventTitle(ctx, e.type, e.data?.toString()), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    eventTitle(ctx, e.type, e.data?.toString()),
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(2.dp))
                 Text(
                     listOf(deviceName, agoText(ctx, e.createdMs, now)).filter { it.isNotBlank() }.joinToString(" · "),
-                    color = Palette.Muted, style = MaterialTheme.typography.labelMedium,
+                    color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
                 )
             }
+            // Visual affordance for the map tap; rows without a location are not
+            // clickable, so the chevron is visual-only there.
+            Spacer(Modifier.width(8.dp))
+            Icon(Icons.Default.ChevronRight, null, tint = Palette.Muted, modifier = Modifier.size(24.dp))
         }
     }
 }
