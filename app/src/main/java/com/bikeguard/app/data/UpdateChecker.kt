@@ -4,14 +4,18 @@ import com.bikeguard.app.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
-/** A newer GitHub Release, when one exists. */
-data class UpdateInfo(val version: String, val url: String)
+/** A newer GitHub Release, when one exists. [apkUrl] is the direct download
+ *  link of the release APK, when the release has one (v1.2.30: the app
+ *  downloads it itself instead of opening the release page). */
+data class UpdateInfo(val version: String, val url: String, val apkUrl: String? = null)
 
 sealed interface UpdateCheckResult {
     data class Available(val info: UpdateInfo) : UpdateCheckResult
@@ -54,7 +58,7 @@ object UpdateChecker {
                     ?: return@withContext UpdateCheckResult.Failed
                 val latest = tag.trimStart('v')
                 if (isNewer(latest, BuildConfig.VERSION_NAME)) {
-                    UpdateCheckResult.Available(UpdateInfo(latest, url))
+                    UpdateCheckResult.Available(UpdateInfo(latest, url, apkUrl(json)))
                 } else {
                     UpdateCheckResult.UpToDate
                 }
@@ -62,6 +66,15 @@ object UpdateChecker {
         } catch (e: Exception) {
             UpdateCheckResult.Failed
         }
+    }
+
+    /** Direct download link of the release APK, when the release has one. */
+    private fun apkUrl(json: JsonObject): String? {
+        val assets = json["assets"]?.jsonArray ?: return null
+        val apk = assets.firstOrNull { it.jsonObject["name"]?.jsonPrimitive?.content == "app-release.apk" }
+            ?: assets.firstOrNull { (it.jsonObject["name"]?.jsonPrimitive?.content ?: "").endsWith(".apk") }
+            ?: return null
+        return apk.jsonObject["browser_download_url"]?.jsonPrimitive?.content
     }
 
     /** "1.2.21" vs "1.2.20": compare segment by segment, numerically. */
