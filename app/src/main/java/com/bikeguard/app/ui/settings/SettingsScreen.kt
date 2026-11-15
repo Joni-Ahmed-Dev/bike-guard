@@ -1,8 +1,14 @@
 package com.bikeguard.app.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -10,9 +16,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bikeguard.app.R
 import com.bikeguard.app.bikeApp
@@ -20,6 +30,7 @@ import com.bikeguard.app.ui.AppViewModel
 import com.bikeguard.app.ui.diagnostics.DiagnosticsScreen
 import com.bikeguard.app.ui.onboarding.OnboardingScreen
 import com.bikeguard.app.ui.rememberNow
+import com.bikeguard.app.ui.theme.Palette
 import com.bikeguard.app.ui.theme.Panel
 
 /**
@@ -61,20 +72,41 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
         Text(stringResource(R.string.tab_settings), style = MaterialTheme.typography.headlineMedium)
 
         // ---- diagnostics: what is happening inside the app, and a report to the diagnostics dashboard ----
-        Panel(Modifier.fillMaxWidth()) {
-            OutlinedButton(
-                onClick = { showDiagnostics = true },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.diag_title)) }
+        // Row, not a bare button: icon circle + title + chevron, like the other screens.
+        Panel(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).clickable { showDiagnostics = true }
+                .semantics(mergeDescendants = true) { role = Role.Button },
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AccentCircle(Icons.Default.BugReport)
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    stringResource(R.string.diag_title),
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Default.ChevronRight, null, tint = Palette.Muted, modifier = Modifier.size(24.dp))
+            }
         }
 
         // ---- setup checklist: the first-run wizard, for this (bike) phone only ----
         if (isTracker) {
-            Panel(Modifier.fillMaxWidth()) {
-                OutlinedButton(
-                    onClick = { showOnboarding = true },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.onb_open)) }
+            Panel(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).clickable { showOnboarding = true }
+                    .semantics(mergeDescendants = true) { role = Role.Button },
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AccentCircle(Icons.Default.Checklist)
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        stringResource(R.string.onb_open),
+                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Icon(Icons.Default.ChevronRight, null, tint = Palette.Muted, modifier = Modifier.size(24.dp))
+                }
             }
         }
 
