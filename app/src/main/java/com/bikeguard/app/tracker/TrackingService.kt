@@ -668,9 +668,9 @@ class TrackingService : Service() {
 
         fun stop(ctx: Context) {
             // Every caller of stop() is an explicit stop (user toggle off,
-            // remote tracking_stop, sign-out, role change to Remote): the
-            // timer ends here. A service restart never goes through stop(),
-            // so the timer survives it.
+            // remote tracking_stop, sign-out, role change to Remote, session
+            // expiry): the timer ends here. A service restart never goes
+            // through stop(), so the timer survives it.
             runCatching { (ctx.applicationContext as BikeGuardApp).prefs.trackingStartedAtMs = 0L }
             ctx.stopService(Intent(ctx, TrackingService::class.java))
         }

@@ -25,8 +25,8 @@ android {
         applicationId = "com.bikeguard.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 29
-        versionName = "1.2.17"
+        versionCode = 30
+        versionName = "1.2.18"
         buildConfigField("String", "SUPABASE_URL", "\"${cfg("SUPABASE_URL")}\"")
         buildConfigField("String", "SHARE_BASE_URL", "\"${cfg("SHARE_BASE_URL")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${cfg("SUPABASE_ANON_KEY")}\"")

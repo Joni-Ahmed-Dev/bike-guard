@@ -20,6 +20,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import com.bikeguard.app.data.MODE_AUTO
 import com.bikeguard.app.tracker.AutoMode
+import com.bikeguard.app.tracker.TrackingService
 import com.bikeguard.app.tracker.WatchdogWorker
 import java.util.concurrent.TimeUnit
 
@@ -46,9 +47,23 @@ class BikeGuardApp : Application() {
         // in the background, and clearSession() then stops tracking and disarms the guard
         // with no signal. The ViewModel only sees it when the UI opens, so watch the flag
         // here in appScope — it outlives screens — and warn on the Tracker phone.
+        // (v1.2.18) clearSession() only flips prefs flags: a foreground service that
+        // is already running keeps its location updates and loops alive, doing
+        // nothing (runCommands/syncSettings early-return once logged out) until
+        // the owner opens the app and endSession() stops it. Stop it here, in
+        // the same place the warning is posted: the session is confirmed dead
+        // (refresh() only sets the flag on a 400/401 rejection, never on a
+        // transient network failure), and stopService() is a no-op when the
+        // service is not running. The warning itself is a separate
+        // notification (id 1004, alerts channel), so stopping the service —
+        // which only removes its own foreground notification (id 1001) —
+        // leaves the warning showing.
         appScope.launch {
             api.sessionExpired.collect { expired ->
-                if (expired && prefs.isTracker) Notifier.sessionExpired(this@BikeGuardApp)
+                if (expired && prefs.isTracker) {
+                    Notifier.sessionExpired(this@BikeGuardApp)
+                    TrackingService.stop(this@BikeGuardApp)
+                }
             }
         }
         // If the process died after the expiry, the persisted flag re-posts the warning
