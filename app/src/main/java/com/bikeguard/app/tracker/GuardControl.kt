@@ -109,6 +109,7 @@ object TrackingControl {
         // The Remote phone never tracks: the widget and tile refuse to start it here.
         if (on && prefs.isRemote) return
         stopJob?.cancel()
+        prefs.lastLocalMasterMs = System.currentTimeMillis()
         prefs.masterOn = on
         prefs.trackingActive = on
         AppLog.i("master", if (on) "on (local)" else "off (local)")

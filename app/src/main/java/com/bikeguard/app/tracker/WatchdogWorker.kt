@@ -48,7 +48,14 @@ class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 val freshMasterOn = cmds.any { c ->
                     c.type == "master_on" &&
                         // Server-computed age (v1.2.8): a wrong phone clock cannot expire it.
-                        c.ageMs < TrackingService.freshWindowMs(c.type)
+                        c.ageMs < TrackingService.freshWindowMs(c.type) &&
+                        !TrackingService.supersededByLocalMaster(app.prefs, c)
+                }
+                // A Remote SOS must wake a stopped tracker too: with the master OFF
+                // nothing else ever polls, and the command used to expire unseen.
+                // The service starts poll only (no GPS) while shouldTrack is false.
+                val freshSos = cmds.any { c ->
+                    c.type == "sos" && c.ageMs < TrackingService.freshWindowMs(c.type)
                 }
                 val freshStartOrArm = cmds.any { c ->
                     (c.type == "tracking_start" || c.type == "arm") &&
@@ -63,7 +70,7 @@ class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 // A fresh master_on revives even when local masterOn is still false:
                 // that is the Remote turning tracking back on. Everything else
                 // needs the local master switch ON.
-                freshMasterOn || (app.prefs.masterOn && (freshStartOrArm || guardArmed))
+                freshMasterOn || freshSos || (app.prefs.masterOn && (freshStartOrArm || guardArmed))
             }.getOrNull() == true
             if (revive && !app.tryStartTracking()) notifyResume(app)
             AppLog.i("watchdog", "revive=" + revive + " running=" + TrackerState.running.value)

@@ -42,8 +42,31 @@ object SosController {
     private const val RETRY_DELAY_MS = 10_000L
     private var job: Job? = null
 
+    /**
+     * An explicit SOS or a crash countdown needs SMS enabled and a number. When it
+     * does not have them it used to return silently while the button still said
+     * "sent" (audit M5). Now the failure is raised as a critical sos_failed alert
+     * with the reason, so the Remote phone and Telegram show it at once.
+     * [explicit] is true for a held SOS button or a Remote SOS.
+     */
+    private fun sosReady(app: BikeGuardApp, explicit: Boolean): Boolean {
+        val prefs = app.prefs
+        // A held SOS button always expects a text. A crash countdown with SMS
+        // switched off on purpose stays quiet (the crash alert itself still
+        // goes out); SMS on with no number is a mistake worth reporting.
+        if (prefs.emergencyNumber.isBlank()) {
+            if (explicit || prefs.sosSms) fail(app, "no emergency number")
+            return false
+        }
+        if (!prefs.sosSms) {
+            if (explicit) fail(app, "sms switched off")
+            return false
+        }
+        return true
+    }
+
     fun startCountdown(app: BikeGuardApp, lat: Double?, lng: Double?) {
-        if (!app.prefs.sosSms || app.prefs.emergencyNumber.isBlank()) return
+        if (!sosReady(app, explicit = false)) return
         cancel(app)
         // Persist BEFORE the coroutine starts: a death at any point after
         // this line still leaves a pending SOS for resumePending to finish.
@@ -100,6 +123,7 @@ object SosController {
      *  dropped first, so the contact gets one SMS, not two. */
     fun sendNow(app: BikeGuardApp, lat: Double?, lng: Double?) {
         cancel(app)
+        if (!sosReady(app, explicit = true)) return
         app.appScope.launch { attemptSend(app, lat, lng) }
     }
 

@@ -31,7 +31,7 @@ object Notifier {
         post(ctx, BikeGuardApp.CHANNEL_GENERAL, id, title, text, NotificationCompat.PRIORITY_DEFAULT)
     }
 
-    /** Fixed id for the session-expired warning (1001 tracking, 1002 watchdog, 1003 SOS). */
+    /** Fixed id for the session-expired warning (1001 tracking, 1002 watchdog, 1003 SOS, 1005 service due). */
     private const val SESSION_EXPIRED_ID = 1004
 
     /**

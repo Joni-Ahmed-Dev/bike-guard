@@ -32,6 +32,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
+private const val PIN_MAX_TRIES = 5
+private const val PIN_LOCK_MS = 5 * 60_000L
+
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as BikeGuardApp
 
@@ -148,10 +151,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Clears the role (so the picker shows again) only when the PIN matches. */
     fun clearRoleAfterPin(pin: String): Boolean {
-        if (app.prefs.rolePin.isEmpty() || pin != app.prefs.rolePin) return false
+        if (app.prefs.rolePin.isEmpty()) return false
+        // A 4 digit PIN has only 10,000 values: after 5 wrong tries in a row the
+        // check locks for 5 minutes, so it cannot be guessed by brute force.
+        if (pinLockRemainingMin() > 0) return false
+        if (pin != app.prefs.rolePin) {
+            val fails = app.prefs.pinFailCount + 1
+            if (fails >= PIN_MAX_TRIES) {
+                app.prefs.pinFailCount = 0
+                app.prefs.pinLockUntilMs = System.currentTimeMillis() + PIN_LOCK_MS
+            } else app.prefs.pinFailCount = fails
+            return false
+        }
+        app.prefs.pinFailCount = 0
         app.prefs.appRole = ""
         role = ""
         return true
+    }
+
+    /** Whole minutes left of a PIN lockout (rounded up), 0 when not locked. */
+    fun pinLockRemainingMin(): Int {
+        val left = app.prefs.pinLockUntilMs - System.currentTimeMillis()
+        return if (left <= 0L) 0 else ((left + 59_999L) / 60_000L).toInt()
     }
 
     /**

@@ -21,7 +21,8 @@ fun agoText(ctx: Context, thenMs: Long, nowMs: Long): String {
         s < 5 -> ctx.getString(R.string.ago_now)
         s < 60 -> ctx.getString(R.string.ago_s, s.toInt())
         s < 3600 -> ctx.getString(R.string.ago_m, (s / 60).toInt())
-        else -> ctx.getString(R.string.ago_h, (s / 3600).toInt())
+        s < 86_400 -> ctx.getString(R.string.ago_h, (s / 3600).toInt())
+        else -> ctx.getString(R.string.ago_d, (s / 86_400).toInt())
     }
 }
 

@@ -373,6 +373,19 @@ class Prefs(private val context: Context) {
         get() = sp.getString("health_state", "") ?: ""
         set(v) = sp.edit { putString("health_state", v) }
 
+    /** Millis of the last master switch tap on THIS phone; 0 = never. Older remote master commands are stale. */
+    var lastLocalMasterMs: Long
+        get() = sp.getLong("last_local_master_ms", 0L)
+        set(v) = sp.edit { putLong("last_local_master_ms", v) }
+
+    /** Wrong role PIN attempts in a row, and the end of the current lockout (millis). */
+    var pinFailCount: Int
+        get() = sp.getInt("pin_fail_count", 0)
+        set(v) = sp.edit { putInt("pin_fail_count", v) }
+    var pinLockUntilMs: Long
+        get() = sp.getLong("pin_lock_until_ms", 0L)
+        set(v) = sp.edit { putLong("pin_lock_until_ms", v) }
+
     /** When the guard was last disarmed by hand, in millis since epoch; 0 = never. Auto re-arm waits 10 minutes after this. */
     var manualDisarmAtMs: Long
         get() = sp.getLong("disarm_at_ms", 0L)

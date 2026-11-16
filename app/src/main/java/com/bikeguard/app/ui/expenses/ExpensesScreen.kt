@@ -55,7 +55,7 @@ fun ExpensesScreen(modifier: Modifier = Modifier, vm: ExpensesViewModel = viewMo
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    stringResource(R.string.exp_total_month, "৳" + total.toInt()),
+                    stringResource(R.string.exp_total_month, "৳" + Math.round(total)),
                     style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
                     color = Palette.Text, modifier = Modifier.weight(1f),
                 )
@@ -66,14 +66,23 @@ fun ExpensesScreen(modifier: Modifier = Modifier, vm: ExpensesViewModel = viewMo
 
         // ---- add-expense form, one white card ----
         Panel(Modifier.fillMaxWidth()) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                 listOf("fuel" to R.string.exp_fuel, "service" to R.string.exp_service, "repair" to R.string.exp_repair, "other" to R.string.exp_other)
                     .forEach { (value, label) ->
                         // Light: solid mint chip with dark text. Dark: 16% amber tint, amber text.
                         val selected = category == value
                         FilterChip(
                             selected = selected, onClick = { category = value },
-                            label = { Text(stringResource(label), style = MaterialTheme.typography.titleMedium) },
+                            modifier = Modifier.weight(1f),
+                            // One line each: "Other" used to wrap letter by letter ("Ot / he / r")
+                            // because the fixed row ran out of width.
+                            label = {
+                                Text(
+                                    stringResource(label), style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Clip,
+                                    modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                )
+                            },
                             shape = RoundedCornerShape(24.dp),
                             border = if (selected) null else BorderStroke(1.dp, Palette.Stroke),
                             colors = FilterChipDefaults.filterChipColors(

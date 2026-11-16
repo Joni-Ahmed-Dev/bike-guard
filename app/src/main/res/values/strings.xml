@@ -47,6 +47,7 @@
     <string name="ago_s">%1$ds ago</string>
     <string name="ago_m">%1$dm ago</string>
     <string name="ago_h">%1$dh ago</string>
+    <string name="ago_d">%1$dd ago</string>
 
     <string name="perm_step">Step %1$d of %2$d</string>
     <string name="perm_notif_title">Allow notifications</string>
@@ -221,6 +222,7 @@
     <string name="role_pin_title">Set a 4-digit PIN</string>
     <string name="role_pin_hint">You need this PIN to change the role later.</string>
     <string name="role_pin_wrong">Wrong PIN</string>
+    <string name="role_pin_locked">Too many wrong tries. Try again in %1$d min.</string>
     <string name="role_change">Change role</string>
     <string name="role_change_title">Enter your PIN to change the role</string>
     <string name="role_current">This phone: %1$s</string>
@@ -316,7 +318,7 @@
     <string name="diag_logs_title">App log</string>
     <string name="diag_logs_empty">No log lines yet</string>
     <string name="diag_logs_hint">These logs go with every report, so the app problem can be read without a screenshot.</string>
-    <string name="dash_tracking_guard_note">Tracking stays on while the guard is armed</string>
+    <string name="dash_tracking_guard_note">Turning this off also turns the guard off</string>
     <string name="dash_tracking_waiting">Waiting for the tracker to confirm…</string>
     <string name="dash_tracking_offline">Tracker offline — this will apply when the bike reconnects</string>
     <string name="guard_countdown">Guard mode in %1$s</string>

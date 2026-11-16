@@ -84,6 +84,12 @@ class TrackingService : Service() {
      * off, the service must stay alive until the fix lands (or this grace
      * expires), or the end-of-batch stop below kills the upload (C3). */
     private var locateGraceUntilMs = 0L
+    /** Ids of commands already executed by this service instance, so a refused ack never re-runs one. */
+    private val executedIds = LinkedHashSet<Long>()
+    private fun rememberExecuted(id: Long) {
+        executedIds.add(id)
+        if (executedIds.size > 200) executedIds.remove(executedIds.first())
+    }
 
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -519,9 +525,29 @@ class TrackingService : Service() {
             val id = c.id ?: continue
             // Freshness is measured against the server-computed age (v1.2.8),
             // so a phone clock minutes wrong cannot expire a live command.
-            val fresh = c.ageMs < freshWindowMs(c.type)
-            if (fresh) execute(c)
-            try { app.api.ackCommand(id, if (fresh) "done" else "expired") } catch (e: IOException) { /* retried next poll */ }
+            // A master_on/master_off older than the last local master tap is
+            // superseded: the owner changed their mind on this phone since.
+            val fresh = c.ageMs < freshWindowMs(c.type) && !supersededByLocalMaster(app.prefs, c)
+            // Never run the same command twice: when an earlier ack was refused
+            // (or lost because the service was stopped), only the ack is retried.
+            val alreadyRan = id in executedIds
+            if (fresh && !alreadyRan) {
+                rememberExecuted(id)
+                // One throwing handler must not starve the commands behind it.
+                try { execute(c) } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    AppLog.i("cmd", (c.type ?: "?") + " failed: " + (e.message ?: e.javaClass.simpleName))
+                }
+            }
+            // The ack must survive the service stopping (master_off stops it
+            // from inside execute); a cancelled ack left the command pending,
+            // so it ran again on the next start.
+            try {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    val ok = app.api.ackCommand(id, if (fresh) "done" else "expired")
+                    if (!ok) AppLog.i("cmd", "ack refused #$id")
+                }
+            } catch (e: IOException) { /* retried next poll, without re-running it */ }
         }
         // C3: do not sit running forever after a master off wake. A batch
         // that contained master_on leaves shouldTrack true, so this never
@@ -834,9 +860,27 @@ class TrackingService : Service() {
          * a late siren or locate is not, so those keep the short window.
          */
         const val FRESH_START_MS = 60 * 60_000L
+        /** A Remote SOS stays executable this long (longer than the 15 min Watchdog tick). */
+        const val FRESH_SOS_MS = 30 * 60_000L
         /** How long a command of [type] stays executable after it was sent. */
-        fun freshWindowMs(type: String?): Long =
-            if (type == "tracking_start" || type == "arm" || type == "master_on") FRESH_START_MS else FRESH_COMMAND_MS
+        fun freshWindowMs(type: String?): Long = when (type) {
+            // master_off gets the same window as master_on: with 10 minutes a dead
+            // tracker left the Remote switch stuck ON once the command expired.
+            "tracking_start", "arm", "master_on", "master_off" -> FRESH_START_MS
+            // A Remote SOS must outlive the 15 min Watchdog tick that wakes a stopped tracker.
+            "sos" -> FRESH_SOS_MS
+            else -> FRESH_COMMAND_MS
+        }
+
+        /** A master command sent before the last local master tap on this phone is stale. */
+        fun supersededByLocalMaster(prefs: com.bikeguard.app.data.Prefs, c: CommandDto): Boolean {
+            if (c.type != "master_on" && c.type != "master_off") return false
+            val last = prefs.lastLocalMasterMs
+            if (last <= 0L) return false
+            // Both sides use this phone's clock: ageMs is a duration, so a wrong
+            // phone clock cancels out.
+            return System.currentTimeMillis() - c.ageMs < last
+        }
         const val ACTION_POLL = "com.bikeguard.app.POLL_COMMANDS"
 
         /** Safe to call repeatedly; also re-applies a changed interval. Throws if Android forbids a background start. */

@@ -208,7 +208,7 @@ class Guard(
             prefs.dueNotified = true
             prefs.stateDirty = true
             raise("service_due", "warning")
-            Notifier.local(ctx, 1004, eventTitle(ctx, "service_due", null), ctx.getString(R.string.service_due_hint))
+            Notifier.local(ctx, 1005, eventTitle(ctx, "service_due", null), ctx.getString(R.string.service_due_hint))
         }
     }
 

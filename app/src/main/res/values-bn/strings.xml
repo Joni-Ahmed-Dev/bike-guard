@@ -47,6 +47,7 @@
     <string name="ago_s">%1$d সেকেন্ড আগে</string>
     <string name="ago_m">%1$d মিনিট আগে</string>
     <string name="ago_h">%1$d ঘণ্টা আগে</string>
+    <string name="ago_d">%1$d দিন আগে</string>
 
     <string name="perm_step">ধাপ %1$d / %2$d</string>
     <string name="perm_notif_title">নোটিফিকেশন চালু করুন</string>
@@ -220,6 +221,7 @@
     <string name="role_pin_title">৪ সংখ্যার PIN দিন</string>
     <string name="role_pin_hint">পরে ভূমিকা বদলাতে এই PIN লাগবে।</string>
     <string name="role_pin_wrong">ভুল PIN</string>
+    <string name="role_pin_locked">অনেকবার ভুল হয়েছে। %1$d মিনিট পরে আবার চেষ্টা করো।</string>
     <string name="role_change">ভূমিকা বদলান</string>
     <string name="role_change_title">ভূমিকা বদলাতে আপনার PIN দিন</string>
     <string name="role_current">এই ফোন: %1$s</string>
@@ -315,7 +317,7 @@
     <string name="diag_logs_title">অ্যাপ লগ</string>
     <string name="diag_logs_empty">এখনো কোনো লগ নেই</string>
     <string name="diag_logs_hint">এই লগগুলো প্রতিটা রিপোর্টের সাথে যায়, তাই স্ক্রিনশট ছাড়াই অ্যাপের সমস্যা পড়া যায়।</string>
-    <string name="dash_tracking_guard_note">গার্ড চালু থাকলে ট্র্যাকিং বন্ধ করা যাবে না</string>
+    <string name="dash_tracking_guard_note">এটা বন্ধ করলে গার্ডও বন্ধ হবে</string>
     <string name="cmd_queued">পাঠানো হয়েছে — ট্র্যাকার এখনো নিশ্চিত করেনি</string>
     <string name="dash_tracking_waiting">ট্র্যাকার নিশ্চিত করার অপেক্ষায়…</string>
     <string name="dash_tracking_offline">ট্র্যাকার অফলাইন — বাইক আবার যুক্ত হলে এটি কার্যকর হবে</string>

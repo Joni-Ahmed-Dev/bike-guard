@@ -213,7 +213,10 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
 
     // ---------- remote control ----------
 
+    /** Covers only the insert of a command. The confirmation wait runs in [confirmJob], so a
+     *  second tap (siren off, SOS, master off) is never dropped for ~36 s after the first. */
     private var sendJob: Job? = null
+    private var confirmJob: Job? = null
     /** Id of the last sent command whose note is still "sent, not confirmed", or null. */
     private var queuedCmdId: Long? = null
     private var queuedExpiryJob: Job? = null
@@ -279,26 +282,31 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
                     }
                     queuedCmdId = null
                 }
-                repeat(12) {                          // wait up to ~36 s for the tracker to confirm
-                    delay(3_000)
-                    val st = try { app.api.commandStatus(cid) } catch (e: IOException) { null }
-                    if (st == "done") {
-                        queuedCmdId = null; queuedExpiryJob?.cancel()
-                        // Don't clear the pending toggle here (v1.2.38): see above.
-                        // Only a confirmed command changes the siren state, never the send itself.
-                        if (type == "siren_on") sirenOn = true
-                        if (type == "siren_off") sirenOn = false
-                        commandNote = R.string.cmd_done; return@launch
+                // Wait up to ~36 s for the tracker to confirm, in its own job so the
+                // next command can be sent meanwhile.
+                confirmJob?.cancel()
+                confirmJob = viewModelScope.launch {
+                    repeat(12) {
+                        delay(3_000)
+                        val st = try { app.api.commandStatus(cid) } catch (e: IOException) { null }
+                        if (st == "done") {
+                            if (queuedCmdId == cid) { queuedCmdId = null; queuedExpiryJob?.cancel() }
+                            // Don't clear the pending toggle here (v1.2.38): see above.
+                            // Only a confirmed command changes the siren state, never the send itself.
+                            if (type == "siren_on") sirenOn = true
+                            if (type == "siren_off") sirenOn = false
+                            commandNote = R.string.cmd_done; return@launch
+                        }
+                        if (st == "expired") {
+                            if (queuedCmdId == cid) { queuedCmdId = null; queuedExpiryJob?.cancel() }
+                            if (trackingTo != null) trackingPendingTo = null
+                            commandNote = R.string.cmd_expired; return@launch
+                        }
                     }
-                    if (st == "expired") {
-                        queuedCmdId = null; queuedExpiryJob?.cancel()
-                        if (trackingTo != null) trackingPendingTo = null
-                        commandNote = R.string.cmd_expired; return@launch
-                    }
+                    // Inserted but unconfirmed: the command is queued on the server and the
+                    // tracker applies it when it next polls, so this is not a failed send.
+                    if (queuedCmdId == cid) commandNote = R.string.cmd_queued
                 }
-                // Inserted but unconfirmed: the command is queued on the server and the
-                // tracker applies it when it next polls, so this is not a failed send.
-                commandNote = R.string.cmd_queued
             } catch (e: IOException) {
                 AppLog.i("cmd", "$type failed")
                 if (trackingTo != null) trackingPendingTo = null

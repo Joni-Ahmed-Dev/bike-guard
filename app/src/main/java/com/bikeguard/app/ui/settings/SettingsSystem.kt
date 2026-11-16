@@ -325,7 +325,13 @@ fun RolePanel(vm: AppViewModel) {
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    if (pinWrong) Text(stringResource(R.string.role_pin_wrong), color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
+                    if (pinWrong) {
+                        val lockedMin = vm.pinLockRemainingMin()
+                        Text(
+                            if (lockedMin > 0) stringResource(R.string.role_pin_locked, lockedMin) else stringResource(R.string.role_pin_wrong),
+                            color = Palette.Danger, style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
             },
             confirmButton = {
