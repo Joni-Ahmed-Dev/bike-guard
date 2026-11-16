@@ -6,6 +6,7 @@ import com.bikeguard.app.BuildConfig
 import com.bikeguard.app.tracker.TrackerState
 import com.bikeguard.app.ui.fmtHourMin
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -113,7 +114,9 @@ class DiagReporter(
                 // App log (v1.2.41): the recent timeline rides with every
                 // report, so the owner can read what the app did without
                 // asking for screenshots. No location in these lines.
-                put("log", buildJsonArray { AppLog.recent(120).forEach { add(it) } })
+                // JsonPrimitive (not a bare String): this serialization
+                // version only takes JsonElement in the array builder.
+                put("log", buildJsonArray { AppLog.recent(120).forEach { add(JsonPrimitive(it)) } })
             }.toString()
             val req = Request.Builder()
                 .url(BuildConfig.DIAG_URL.trimEnd('/') + "/report?token=" + BuildConfig.DIAG_TOKEN)
