@@ -428,7 +428,7 @@ class TrackingService : Service() {
         }
     }
 
-    private fun execute(c: CommandDto) {
+    private suspend fun execute(c: CommandDto) {
         when (c.type) {
             "locate" -> locateNow()
             "live" -> { guard.goLive(15); reevaluateInterval() }
