@@ -107,6 +107,7 @@ class TrackingService : Service() {
             onAutoArmed = { pushSettingsToServer(guardArmed = true) },
         )
         guard.start()
+        com.bikeguard.app.push.PushRegistrar.register(app)
         // A 60 s SOS countdown that outlived the process (v1.2.19): re-arm it
         // here, or send at once when its deadline already passed.
         SosController.resumePending(app)

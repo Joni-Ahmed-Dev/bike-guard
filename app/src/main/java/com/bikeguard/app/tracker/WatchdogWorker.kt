@@ -30,6 +30,10 @@ class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         // Heartbeat to the diagnostics Worker, so the owner can see the tracker
         // is alive even when Supabase sync is failing.
         app.diag.report("heartbeat")
+        // Re-register the push token: it used to happen only when the screen was
+        // opened, and the bike phone is rarely opened, so it could stay without a
+        // token and a Remote ON could not wake it.
+        com.bikeguard.app.push.PushRegistrar.register(app)
         // Remote alerts without FCM: (re)start the app-level Realtime listener
         // (covers a sign-in or role pick that happened after app start) and poll
         // the events table, so alerts still arrive when the process was killed.
