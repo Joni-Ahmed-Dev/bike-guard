@@ -265,7 +265,10 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
                     if (queuedCmdId != cid) return@launch
                     val st = try { app.api.commandStatus(cid) } catch (e: IOException) { null }
                     if (st == "done") {
-                        if (trackingTo != null) trackingPendingTo = null
+                        // Don't clear the pending toggle here (v1.2.38): the switch
+                        // keeps showing the confirmed value until the tracker's
+                        // mirrored flag catches up, instead of flipping back to
+                        // the stale mirror. The Dashboard clears it when they match.
                         commandNote = R.string.cmd_done
                     } else {
                         if (trackingTo != null) trackingPendingTo = null
@@ -278,7 +281,7 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
                     val st = try { app.api.commandStatus(cid) } catch (e: IOException) { null }
                     if (st == "done") {
                         queuedCmdId = null; queuedExpiryJob?.cancel()
-                        if (trackingTo != null) trackingPendingTo = null
+                        // Don't clear the pending toggle here (v1.2.38): see above.
                         // Only a confirmed command changes the siren state, never the send itself.
                         if (type == "siren_on") sirenOn = true
                         if (type == "siren_off") sirenOn = false

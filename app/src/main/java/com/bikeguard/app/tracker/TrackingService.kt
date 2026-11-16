@@ -452,6 +452,11 @@ class TrackingService : Service() {
                 if (!app.prefs.parkingArmed && app.prefs.mode != MODE_ALWAYS) {
                     app.prefs.trackingActive = false
                     app.prefs.stateDirty = true
+                    // Push the new state to the server BEFORE the service stops (v1.2.38):
+                    // stopService() kills the scope that would have flushed the mirror
+                    // patch, so the Remote's toggle waited for a confirmation that never
+                    // came and the switch stayed ON after tracking had already stopped.
+                    withTimeoutOrNull(8_000) { app.sync.flush() }
                     TrackingService.stop(this)
                 }
             }
