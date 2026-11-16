@@ -2,6 +2,7 @@ package com.bikeguard.app.tracker
 
 import android.content.Context
 import com.bikeguard.app.bikeApp
+import com.bikeguard.app.data.AppLog
 import com.bikeguard.app.data.PendingEvent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -23,6 +24,7 @@ object GuardControl {
      */
     fun setArmed(ctx: Context, on: Boolean, latch: Boolean = true, local: Boolean = true) {
         val app = ctx.bikeApp
+        AppLog.i("guard", if (on) "armed" else "disarmed")
         app.prefs.parkingArmed = on
         // A disarm drops the saved anchor (every disarm path runs through here:
         // UI toggle, widget, remote command, server settings sync, schedule
@@ -82,6 +84,7 @@ object TrackingControl {
         stopJob?.cancel()
         prefs.masterOn = on
         prefs.trackingActive = on
+        AppLog.i("master", if (on) "on (local)" else "off (local)")
         if (on) {
             // Arms the guard, starts tracking and flushes the new state.
             GuardControl.setArmed(ctx, true)
@@ -98,5 +101,8 @@ object TrackingControl {
                 TrackingService.stop(ctx)
             }
         }
+        // The log rides with the report (v1.2.41), so a local tap is readable
+        // without waiting for the 15 min heartbeat.
+        app.appScope.launch { app.diag.reportAuto("master " + if (on) "on" else "off") }
     }
 }

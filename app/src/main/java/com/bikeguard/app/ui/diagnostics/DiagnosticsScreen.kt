@@ -28,11 +28,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bikeguard.app.BuildConfig
 import com.bikeguard.app.R
 import com.bikeguard.app.bikeApp
+import com.bikeguard.app.data.AppLog
 import com.bikeguard.app.data.ReportOutcome
 import com.bikeguard.app.tracker.TrackerState
 import com.bikeguard.app.ui.agoText
@@ -66,6 +68,8 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     var sending by remember { mutableStateOf(false) }
     var sendResult by remember { mutableStateOf<String?>(null) }
     var sendOk by remember { mutableStateOf<Boolean?>(null) }
+    // App log (v1.2.41): read once here, refreshed after a report is sent.
+    var logLines by remember { mutableStateOf(AppLog.recent(120)) }
 
     Column(
         modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -160,6 +164,7 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         },
                     )
                     sending = false
+                    logLines = AppLog.recent(120)
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -171,6 +176,19 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
+        // App log (v1.2.41): the same lines that ride with every report, so
+        // the owner can see here what the report carries.
+        Panel(Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.diag_logs_title), style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (logLines.isEmpty()) stringResource(R.string.diag_logs_empty)
+                else logLines.joinToString("\n"),
+                fontFamily = FontFamily.Monospace,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        Text(stringResource(R.string.diag_logs_hint), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.diag_hint), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
     }

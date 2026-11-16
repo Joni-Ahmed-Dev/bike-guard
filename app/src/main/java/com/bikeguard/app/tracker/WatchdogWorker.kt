@@ -11,6 +11,7 @@ import com.bikeguard.app.BikeGuardApp
 import com.bikeguard.app.MainActivity
 import com.bikeguard.app.R
 import com.bikeguard.app.bikeApp
+import com.bikeguard.app.data.AppLog
 import com.bikeguard.app.data.Perms
 
 /** Runs about every 15 minutes: uploads the queue and revives tracking if Android killed it. */
@@ -50,6 +51,7 @@ class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 freshStart || guardArmed
             }.getOrNull() == true
             if (revive && !app.tryStartTracking()) notifyResume(app)
+            AppLog.i("watchdog", "revive=" + revive + " running=" + TrackerState.running.value)
         }
         if (app.prefs.shouldTrack && !TrackerState.running.value && Perms.hasFine(app)) {
             if (!app.tryStartTracking()) notifyResume(app)

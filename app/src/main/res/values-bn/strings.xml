@@ -313,6 +313,9 @@
     <string name="diag_ok">ঠিক আছে</string>
     <string name="diag_failed_short">ব্যর্থ</string>
     <string name="diag_hint">এই রিপোর্ট ডায়াগনস্টিকস সার্ভারে যায়, যাতে স্ক্রিনশট ছাড়াই অ্যাপের সমস্যা দেখা যায়। কোনো লোকেশন পাঠানো হয় না।</string>
+    <string name="diag_logs_title">অ্যাপ লগ</string>
+    <string name="diag_logs_empty">এখনো কোনো লগ নেই</string>
+    <string name="diag_logs_hint">এই লগগুলো প্রতিটা রিপোর্টের সাথে যায়, তাই স্ক্রিনশট ছাড়াই অ্যাপের সমস্যা পড়া যায়।</string>
     <string name="dash_tracking_guard_note">গার্ড চালু থাকলে ট্র্যাকিং বন্ধ করা যাবে না</string>
     <string name="cmd_queued">পাঠানো হয়েছে — ট্র্যাকার এখনো নিশ্চিত করেনি</string>
     <string name="dash_tracking_waiting">ট্র্যাকার নিশ্চিত করার অপেক্ষায়…</string>

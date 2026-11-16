@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.bikeguard.app.data.AppLog
 import com.bikeguard.app.data.AppDatabase
 import com.bikeguard.app.data.Prefs
 import com.bikeguard.app.data.RtEvent
@@ -46,6 +47,7 @@ class BikeGuardApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        AppLog.init(this)
         prefs = Prefs(this)
         api = SupabaseApi(prefs)
         db = AppDatabase.get(this)

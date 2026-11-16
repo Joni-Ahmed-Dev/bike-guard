@@ -10,6 +10,7 @@ import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import com.bikeguard.app.BikeGuardApp
 import com.bikeguard.app.R
+import com.bikeguard.app.data.AppLog
 import com.bikeguard.app.data.eventTitle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -139,6 +140,7 @@ class Guard(private val ctx: Context, private val app: BikeGuardApp) : SensorGua
             anchor?.let { a ->
                 val d = loc.distanceTo(a)
                 if (d > max(60f, (if (loc.hasAccuracy()) loc.accuracy else 0f) * 2) && cooled("moved", 5 * 60_000L)) {
+                    AppLog.i("guard", "moved ${d.roundToInt()}m")
                     raise("moved", "critical", buildJsonObject { put("meters", d.roundToInt()) })
                     goLive(15)
                     if (prefs.sirenOnAlert) SirenPlayer.start(ctx, 30)
@@ -194,6 +196,7 @@ class Guard(private val ctx: Context, private val app: BikeGuardApp) : SensorGua
 
     override fun onMotion() {
         if (!prefs.parkingArmed || !cooled("motion", 2 * 60_000L)) return
+        AppLog.i("guard", "motion")
         raise("motion", "warning")
         goLive(5)
         if (prefs.sirenOnAlert) SirenPlayer.start(ctx, 30)

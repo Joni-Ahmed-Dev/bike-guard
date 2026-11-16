@@ -314,6 +314,9 @@
     <string name="diag_ok">OK</string>
     <string name="diag_failed_short">Failed</string>
     <string name="diag_hint">This report goes to the diagnostics server so the app problem can be seen without a screenshot. No location is sent.</string>
+    <string name="diag_logs_title">App log</string>
+    <string name="diag_logs_empty">No log lines yet</string>
+    <string name="diag_logs_hint">These logs go with every report, so the app problem can be read without a screenshot.</string>
     <string name="dash_tracking_guard_note">Tracking stays on while the guard is armed</string>
     <string name="dash_tracking_waiting">Waiting for the tracker to confirm…</string>
     <string name="dash_tracking_offline">Tracker offline — this will apply when the bike reconnects</string>

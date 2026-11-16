@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat
 import com.bikeguard.app.BikeGuardApp
 import com.bikeguard.app.MainActivity
 import com.bikeguard.app.R
+import com.bikeguard.app.data.AppLog
 import com.bikeguard.app.data.CommandDto
 import com.bikeguard.app.data.DeviceSettingsDto
 import com.bikeguard.app.data.MODE_ALWAYS
@@ -202,6 +203,7 @@ class TrackingService : Service() {
         }
         requestUpdates(app.prefs.intervalSec.coerceIn(3, 60) * 1000L)
         TrackerState.running.value = true
+        AppLog.i("tracking", "started")
         // Master switch ON (v1.2.40): live starts with the service, so a local
         // ON tap is live from the first fix, not only after a remote command.
         if (app.prefs.masterOn && !guard.isLive()) guard.goLive(15)
@@ -412,6 +414,7 @@ class TrackingService : Service() {
     private fun autoStop() {
         if (autoStopping) return
         autoStopping = true
+        AppLog.i("tracking", "auto stop: parked")
         app.prefs.trackingActive = false
         app.prefs.trackingStartedAtMs = 0L // explicit stop: the timer ends here
         scope.launch {
@@ -436,6 +439,7 @@ class TrackingService : Service() {
     }
 
     private suspend fun execute(c: CommandDto) {
+        AppLog.i("cmd", (c.type ?: "?") + (c.id?.let { " #$it" } ?: "") + (c.arg?.let { " $it" } ?: ""))
         when (c.type) {
             "locate" -> locateNow()
             "live" -> { guard.goLive(15); reevaluateInterval() }
@@ -498,6 +502,9 @@ class TrackingService : Service() {
             }
         }
         flushSignal.trySend(Unit)
+        // The log rides with the report (v1.2.41): after a command runs, the
+        // owner can read what happened without waiting for the 15 min heartbeat.
+        scope.launch { app.diag.reportAuto("cmd " + (c.type ?: "?")) }
     }
 
     // ---------- server-synced settings (v1.1.0) ----------
@@ -665,6 +672,7 @@ class TrackingService : Service() {
     override fun onDestroy() {
         client.removeLocationUpdates(callback)
         guard.stop()
+        AppLog.i("tracking", "stopped")
         SirenPlayer.stop(this)
         scope.cancel()
         TrackerState.running.value = false

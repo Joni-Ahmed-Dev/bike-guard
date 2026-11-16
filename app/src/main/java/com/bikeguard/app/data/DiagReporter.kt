@@ -6,6 +6,7 @@ import com.bikeguard.app.BuildConfig
 import com.bikeguard.app.tracker.TrackerState
 import com.bikeguard.app.ui.fmtHourMin
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
@@ -53,6 +54,20 @@ class DiagReporter(
     var lastHttpCode: Int = 0
         private set
 
+    // Throttle for [reportAuto]: at most one automatic report a minute, so a
+    // flapping state cannot flood the Worker. Manual reports and heartbeats
+    // bypass this.
+    private var lastAutoReportMs = 0L
+
+    /** Automatic report (command executed, tracking started/stopped): sent at
+     * most once a minute. Best-effort; never throws. */
+    suspend fun reportAuto(note: String): Boolean {
+        val now = System.currentTimeMillis()
+        if (now - lastAutoReportMs < 60_000) return false
+        lastAutoReportMs = now
+        return report(note)
+    }
+
     /** @return true when the Worker accepted the snapshot. Never throws. */
     suspend fun report(note: String): Boolean =
         reportDetailed(note) == ReportOutcome.SENT
@@ -95,6 +110,10 @@ class DiagReporter(
                 put("last_sync_at", if (prefs.lastSyncAttemptMs == 0L) "" else fmtHourMin(prefs.lastSyncAttemptMs))
                 put("battery", battery)
                 put("note", note.take(200))
+                // App log (v1.2.41): the recent timeline rides with every
+                // report, so the owner can read what the app did without
+                // asking for screenshots. No location in these lines.
+                put("log", buildJsonArray { AppLog.recent(120).forEach { add(it) } })
             }.toString()
             val req = Request.Builder()
                 .url(BuildConfig.DIAG_URL.trimEnd('/') + "/report?token=" + BuildConfig.DIAG_TOKEN)

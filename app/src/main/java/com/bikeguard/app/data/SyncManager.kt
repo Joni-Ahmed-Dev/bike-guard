@@ -38,6 +38,11 @@ class SyncManager(
         val outcome = flushLocked()
         prefs.lastSyncAttemptMs = now
         prefs.lastSyncError = if (outcome.ok) "" else (outcome.error ?: "no internet")
+        // Log a failure only when the reason changes (v1.2.41): the flush runs
+        // often, and the same "no internet" line a hundred times buries the log.
+        if (!outcome.ok && prefs.lastSyncError != prevError) {
+            AppLog.i("sync", "failed: " + prefs.lastSyncError)
+        }
         if (outcome.ok) {
             // A working flush clears any earlier rejection streak and backoff.
             if (prefs.serverRejectCount != 0 || prefs.syncBackoffUntilMs != 0L) {
