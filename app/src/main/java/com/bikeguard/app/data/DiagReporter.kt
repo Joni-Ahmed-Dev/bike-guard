@@ -5,7 +5,9 @@ import android.os.BatteryManager
 import com.bikeguard.app.BuildConfig
 import com.bikeguard.app.tracker.TrackerState
 import com.bikeguard.app.ui.fmtHourMin
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -127,9 +129,15 @@ class DiagReporter(
                 .url(BuildConfig.DIAG_URL.trimEnd('/') + "/report?token=" + BuildConfig.DIAG_TOKEN)
                 .post(payload.toRequestBody("application/json; charset=utf-8".toMediaType()))
                 .build()
-            val outcome = http.newCall(req).execute().use { resp ->
-                lastHttpCode = resp.code
-                if (resp.isSuccessful) ReportOutcome.SENT else ReportOutcome.REJECTED
+            // Blocking network call: must run off the main thread (v1.2.43).
+            // The manual Send button calls this from a Main-dispatcher scope,
+            // so without this every tap died with NetworkOnMainThreadException
+            // before the request ever left the phone.
+            val outcome = withContext(Dispatchers.IO) {
+                http.newCall(req).execute().use { resp ->
+                    lastHttpCode = resp.code
+                    if (resp.isSuccessful) ReportOutcome.SENT else ReportOutcome.REJECTED
+                }
             }
             lastOutcome = outcome
             prefs.lastDiagReportAtMs = now
