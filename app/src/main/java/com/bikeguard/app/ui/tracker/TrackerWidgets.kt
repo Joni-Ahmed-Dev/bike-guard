@@ -76,11 +76,15 @@ fun StatusRing(running: Boolean, offline: Boolean, always: Boolean, idleLabel: I
             drawCircle(color.copy(alpha = 0.22f), radius = size.minDimension / 2 - inset, style = Stroke(stroke))
             if (running) {
                 rotate(rot) {
+                    // Butt caps (v1.2.39): with Round caps the sweep gradient's
+                    // wraparound painted the start cap's trailing half in full
+                    // color while the arc body faded from transparent, so a
+                    // small extra dot sat apart from the ring while loading.
                     drawArc(
                         brush = Brush.sweepGradient(listOf(Color.Transparent, color), center = center),
                         startAngle = 0f, sweepAngle = 280f, useCenter = false,
                         topLeft = Offset(inset, inset), size = Size(size.width - stroke, size.height - stroke),
-                        style = Stroke(stroke, cap = StrokeCap.Round),
+                        style = Stroke(stroke, cap = StrokeCap.Butt),
                     )
                 }
             }

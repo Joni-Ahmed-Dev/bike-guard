@@ -35,6 +35,8 @@ sealed interface UpdateCheckResult {
 object UpdateChecker {
     private const val LATEST_URL =
         "https://api.github.com/repos/Joni-Ahmed-Dev/bike-guard/releases/latest"
+    private const val LATEST_PAGE_URL =
+        "https://github.com/Joni-Ahmed-Dev/bike-guard/releases/latest"
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -42,29 +44,54 @@ object UpdateChecker {
         .build()
 
     suspend fun checkLatest(): UpdateCheckResult = withContext(Dispatchers.IO) {
-        try {
-            val req = Request.Builder()
-                .url(LATEST_URL)
-                .header("Accept", "application/vnd.github+json")
-                .build()
-            http.newCall(req).execute().use { resp ->
-                if (resp.code == 404) return@withContext UpdateCheckResult.UpToDate
-                if (!resp.isSuccessful) return@withContext UpdateCheckResult.Failed
-                val body = resp.body?.string() ?: return@withContext UpdateCheckResult.Failed
-                val json = Json.parseToJsonElement(body).jsonObject
-                val tag = json["tag_name"]?.jsonPrimitive?.content
-                    ?: return@withContext UpdateCheckResult.Failed
-                val url = json["html_url"]?.jsonPrimitive?.content
-                    ?: return@withContext UpdateCheckResult.Failed
-                val latest = tag.trimStart('v')
-                if (isNewer(latest, BuildConfig.VERSION_NAME)) {
-                    UpdateCheckResult.Available(UpdateInfo(latest, url, apkUrl(json)))
-                } else {
-                    UpdateCheckResult.UpToDate
-                }
+        try { checkViaPage() } catch (e: Exception) { null }
+            ?: try { checkViaApi() } catch (e: Exception) { null }
+            ?: UpdateCheckResult.Failed
+    }
+
+    /**
+     * Primary check (v1.2.39): the releases page redirects to /tag/vX.Y.Z, so
+     * the tag comes from the final URL — no API call, so the check works even
+     * when the phone's shared mobile IP has used up GitHub's unauthenticated
+     * API quota (60/hr), which is what left the tracker phone saying "could
+     * not check" on working internet. The APK link is the standard release
+     * asset URL. Returns null when it cannot tell, so the API gets a turn.
+     */
+    private fun checkViaPage(): UpdateCheckResult? {
+        val req = Request.Builder().url(LATEST_PAGE_URL).build()
+        http.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) return null
+            val tag = resp.request.url.toString().substringAfterLast("/tag/", "")
+            if (tag.isEmpty()) return null
+            val latest = tag.trimStart('v')
+            if (!isNewer(latest, BuildConfig.VERSION_NAME)) return UpdateCheckResult.UpToDate
+            val apkUrl =
+                "https://github.com/Joni-Ahmed-Dev/bike-guard/releases/download/$tag/app-release.apk"
+            return UpdateCheckResult.Available(
+                UpdateInfo(latest, "https://github.com/Joni-Ahmed-Dev/bike-guard/releases/tag/$tag", apkUrl),
+            )
+        }
+    }
+
+    /** Fallback: the public releases API. Null when it cannot tell either. */
+    private fun checkViaApi(): UpdateCheckResult? {
+        val req = Request.Builder()
+            .url(LATEST_URL)
+            .header("Accept", "application/vnd.github+json")
+            .build()
+        http.newCall(req).execute().use { resp ->
+            if (resp.code == 404) return UpdateCheckResult.UpToDate
+            if (!resp.isSuccessful) return null
+            val body = resp.body?.string() ?: return null
+            val json = Json.parseToJsonElement(body).jsonObject
+            val tag = json["tag_name"]?.jsonPrimitive?.content ?: return null
+            val url = json["html_url"]?.jsonPrimitive?.content ?: return null
+            val latest = tag.trimStart('v')
+            if (isNewer(latest, BuildConfig.VERSION_NAME)) {
+                UpdateCheckResult.Available(UpdateInfo(latest, url, apkUrl(json)))
+            } else {
+                UpdateCheckResult.UpToDate
             }
-        } catch (e: Exception) {
-            UpdateCheckResult.Failed
         }
     }
 
