@@ -204,6 +204,19 @@ fun DashboardScreen(
                 Spacer(Modifier.height(8.dp))
                 Text(stringResource(it), color = Palette.Muted, style = MaterialTheme.typography.labelMedium)
             }
+            // Guard countdown (v1.2.42): the bike stopped but the guard has not
+            // armed itself yet — show how long until it does. `now` ticks every
+            // second, so this counts down live while it is visible.
+            val parkedSinceMs = device?.parkedSinceMs ?: 0L
+            if (device?.armed != true && parkedSinceMs > 0L) {
+                val remainingMs = parkedSinceMs + 5 * 60_000L - now
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    if (remainingMs <= 0) stringResource(R.string.guard_arming)
+                    else stringResource(R.string.guard_countdown, fmtCountdownMs(remainingMs)),
+                    color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
 
         // ---- remote tracking on/off (Remote role only; the tracker phone never sees this) ----
@@ -389,6 +402,12 @@ fun DashboardScreen(
         }
         Spacer(Modifier.height(12.dp))
     }
+}
+
+/** "M:SS" remaining, e.g. 4:32 (guard countdown, v1.2.42). */
+private fun fmtCountdownMs(remainingMs: Long): String {
+    val totalSec = (remainingMs / 1000).coerceAtLeast(0)
+    return "${totalSec / 60}:${(totalSec % 60).toString().padStart(2, '0')}"
 }
 
 /** 48dp pale-mint circle with a Leaf icon — same as the Settings rows. */

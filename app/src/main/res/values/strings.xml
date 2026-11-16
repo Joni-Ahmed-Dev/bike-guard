@@ -174,7 +174,6 @@
     <string name="set_guard">Anti-theft</string>
     <string name="guard_parking">Parking mode</string>
     <string name="guard_parking_desc">Alerts you if the parked bike is moved or tampered with. Turn it off before you ride.</string>
-    <string name="guard_auto">Arm automatically after 5 min parked</string>
     <string name="guard_siren">Sound the siren on a theft alert</string>
     <string name="set_safety">Safety</string>
     <string name="safety_crash">Crash detection</string>
@@ -320,6 +319,8 @@
     <string name="dash_tracking_guard_note">Tracking stays on while the guard is armed</string>
     <string name="dash_tracking_waiting">Waiting for the tracker to confirm…</string>
     <string name="dash_tracking_offline">Tracker offline — this will apply when the bike reconnects</string>
+    <string name="guard_countdown">Guard mode in %1$s</string>
+    <string name="guard_arming">Arming…</string>
     <string name="route_line_title">Route line</string>
     <string name="route_line_desc">Draw the route line on the map.</string>
     <string name="channel_general">General notifications</string>

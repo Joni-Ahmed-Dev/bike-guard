@@ -86,9 +86,15 @@ object TrackingControl {
         prefs.trackingActive = on
         AppLog.i("master", if (on) "on (local)" else "off (local)")
         if (on) {
-            // Arms the guard, starts tracking and flushes the new state.
-            GuardControl.setArmed(ctx, true)
+            // The guard no longer arms at once (v1.2.42): it arms itself 5
+            // minutes after the bike stops. A fresh ON clears the
+            // manual-disarm latch, so it is never blocked for 10 minutes.
+            // Live starts with the service (beginUpdates goes live while the
+            // master is on), so no guard call is needed here.
+            prefs.manualDisarmAtMs = 0L
+            prefs.stateDirty = true
             ctx.tryStartTracking()
+            app.appScope.launch { app.sync.flush() }
         } else {
             // Disarms the guard and clears the anchor.
             GuardControl.setArmed(ctx, false)

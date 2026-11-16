@@ -91,7 +91,11 @@ class TrackingService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        guard = Guard(this, app)
+        guard = Guard(
+            this, app,
+            onWakeMotion = { wakeGpsForMotion() },
+            onAutoArmed = { pushSettingsToServer(guardArmed = true) },
+        )
         guard.start()
         // A 60 s SOS countdown that outlived the process (v1.2.19): re-arm it
         // here, or send at once when its deadline already passed.
@@ -151,6 +155,21 @@ class TrackingService : Service() {
             while (isActive) {
                 try { syncSettings() } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e }
                 delay(30_000)
+            }
+        }
+        // Parked with GPS off (v1.2.42): no fixes arrive, so the Dashboard
+        // would decay to Delayed/Offline even though the tracker is alive
+        // and guarding. Re-send the saved anchor every 10 min as a location
+        // (speed 0, same spot: zero trip distance) so last_seen stays fresh.
+        // No GPS is used: the coordinates come from the saved anchor.
+        scope.launch {
+            while (isActive) {
+                delay(STATIONARY_HEARTBEAT_MS)
+                try {
+                    if (TrackerState.parked.value && app.prefs.parkingArmed && !updating) heartbeatParkedAnchor()
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                }
             }
         }
     }
@@ -329,11 +348,33 @@ class TrackingService : Service() {
         lastBattery = battery
         lastCharging = charging
         TrackerState.parked.value = stationaryFor >= AdaptivePolicy.PARKED_AFTER_MS
+        val p = app.prefs
+        // Publish when the bike stopped (v1.2.42): the Remote Dashboard counts
+        // down from here to the guard arming itself. The stamp is the moment
+        // of the last movement, so it survives a service restart. Only the
+        // transitions mark the state dirty, so a parked bike does not spam patches.
+        if (speedMs >= AdaptivePolicy.MOVING_SPEED_MS) {
+            if (p.parkedSinceMs != 0L) { p.parkedSinceMs = 0L; p.stateDirty = true }
+        } else if (p.parkedSinceMs == 0L) {
+            p.parkedSinceMs = System.currentTimeMillis() - stationaryFor
+            p.stateDirty = true
+        }
         reevaluateInterval()
 
         // Guard sees every raw fix, so tamper / movement detection is unaffected by the
         // jitter filter below: its own "moved" threshold still fires on a real displacement.
         guard.onFix(loc, speedMs, battery, stationaryFor)
+
+        // Parked and armed (v1.2.42): the accelerometer watches the bike now,
+        // so GPS can sleep until motion wakes it again. The 15 s command poll,
+        // the flush loop and the 5 s watchdog are all delay-based coroutines,
+        // so they keep running with GPS off.
+        if (TrackerState.parked.value && p.parkingArmed && guard.hasAnchor && updating) {
+            client.removeLocationUpdates(callback)
+            updating = false
+            currentIntervalMs = 0L
+            AppLog.i("gps", "off: parked")
+        }
 
         // GPS jitter while parked: never upload it, never move the displayed marker.
         if (isAcceptedFix(loc, speedMs, now)) {
@@ -390,8 +431,21 @@ class TrackingService : Service() {
 
         if (now - lastWidgetAt > 30_000) { lastWidgetAt = now; TrackerWidget.update(this) }
 
-        val p = app.prefs
         if (p.mode == MODE_AUTO && stationaryFor >= AdaptivePolicy.AUTO_STOP_AFTER_MS && !p.parkingArmed && !guard.isLive()) autoStop()
+    }
+
+    /**
+     * Motion while parked with GPS off (v1.2.42): resume fixes at once so a real
+     * move is measured against the guard anchor instead of waiting for the next
+     * scheduled fix. No-op while updates are already running. The stationary
+     * clock restarts here: the bike was just handled, so "stopped since" is now.
+     */
+    private fun wakeGpsForMotion() {
+        if (updating) return
+        lastMoveAt = SystemClock.elapsedRealtime()
+        requestUpdates(app.prefs.intervalSec.coerceIn(3, 60) * 1000L)
+        seedLastKnown(force = true)
+        AppLog.i("gps", "on: motion")
     }
 
     /**
@@ -408,6 +462,26 @@ class TrackingService : Service() {
         if (now - lastMoveAt < STOP_SETTLE_MS) return true
         val threshold = maxOf(if (loc.hasAccuracy()) loc.accuracy else 0f, JITTER_FLOOR_M)
         return loc.distanceTo(anchor) >= threshold
+    }
+
+    /**
+     * Parked anchor heartbeat (v1.2.42): while GPS sleeps, re-send the saved
+     * parked spot as a location row so the Remote phone still sees the bike
+     * live. Uses the saved anchor coordinates, never a fresh fix.
+     */
+    private suspend fun heartbeatParkedAnchor() {
+        val lat = app.prefs.guardAnchorLat ?: return
+        val lng = app.prefs.guardAnchorLng ?: return
+        val (battery, charging) = batteryInfo()
+        app.db.pending().insert(
+            PendingLocation(
+                lat = lat, lng = lng, speed = 0f, bearing = null, accuracy = null,
+                battery = battery, charging = charging, recordedAt = System.currentTimeMillis()
+            )
+        )
+        app.db.pending().trim(MAX_QUEUE)
+        flushSignal.trySend(Unit)
+        AppLog.i("gps", "anchor heartbeat")
     }
 
     /** Auto mode: parked long enough. Upload what is queued, then stop. The next "in vehicle" event restarts us. */
@@ -457,17 +531,18 @@ class TrackingService : Service() {
                 tryStartTracking()
             }
             "master_on" -> {
-                // Master switch ON (v1.2.40): everything on — tracking, guard, live.
-                // The state is set before setArmed, so the flush it launches
-                // already reads the new master value.
+                // Master switch ON (v1.2.42): tracking and live start at once,
+                // but the guard no longer arms instantly — it arms itself 5
+                // minutes after the bike stops (Guard.onFix), so no
+                // guardArmed mirror is pushed here either. A fresh ON clears
+                // the manual-disarm latch, so it is never blocked for 10 minutes.
                 app.prefs.masterOn = true
                 app.prefs.trackingActive = true
                 app.prefs.stateDirty = true
-                GuardControl.setArmed(this, true)
+                app.prefs.manualDisarmAtMs = 0L
                 guard.goLive(15)
                 reevaluateInterval()
                 tryStartTracking()
-                pushSettingsToServer(guardArmed = true)
             }
             "master_off" -> {
                 // Master switch OFF (v1.2.40): everything off, no exceptions.
@@ -614,8 +689,8 @@ class TrackingService : Service() {
         val inside = if (start < end) hour in start until end else hour >= start || hour < end
         // After a manual disarm the guard stays off for 10 minutes, even inside the window.
         val latched = System.currentTimeMillis() - p.manualDisarmAtMs < DISARM_LATCH_MS
-        if (inside && !p.parkingArmed && !latched) { GuardControl.setArmed(this, true); p.scheduleArmed = true }
-        else if (!inside && p.scheduleArmed) { GuardControl.setArmed(this, false, latch = false); p.scheduleArmed = false }
+        if (inside && !p.parkingArmed && !latched) { GuardControl.setArmed(this, true); p.scheduleArmed = true; pushSettingsToServer(guardArmed = true) }
+        else if (!inside && p.scheduleArmed) { GuardControl.setArmed(this, false, latch = false); p.scheduleArmed = false; pushSettingsToServer(guardArmed = false) }
     }
 
     /** Raises one health_warning event when the tracker's health changes for the worse,

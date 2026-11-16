@@ -173,7 +173,6 @@
     <string name="set_guard">চুরি-প্রতিরোধ</string>
     <string name="guard_parking">পার্কিং মোড</string>
     <string name="guard_parking_desc">পার্ক করা বাইক সরানো বা ছেঁড়াছেঁড়ি হলে সতর্ক করে। চালানোর আগে বন্ধ করুন।</string>
-    <string name="guard_auto">৫ মিনিট পার্ক থাকলে নিজে চালু হবে</string>
     <string name="guard_siren">চুরির সতর্কতায় সাইরেন বাজবে</string>
     <string name="set_safety">নিরাপত্তা</string>
     <string name="safety_crash">দুর্ঘটনা শনাক্তকরণ</string>
@@ -320,6 +319,8 @@
     <string name="cmd_queued">পাঠানো হয়েছে — ট্র্যাকার এখনো নিশ্চিত করেনি</string>
     <string name="dash_tracking_waiting">ট্র্যাকার নিশ্চিত করার অপেক্ষায়…</string>
     <string name="dash_tracking_offline">ট্র্যাকার অফলাইন — বাইক আবার যুক্ত হলে এটি কার্যকর হবে</string>
+    <string name="guard_countdown">গার্ড মোডে যেতে আরো %1$s</string>
+    <string name="guard_arming">গার্ড চালু হচ্ছে…</string>
     <string name="route_line_title">রুটের দাগ</string>
     <string name="route_line_desc">ম্যাপে বাইকের চলার পথের দাগ দেখাবে।</string>
     <string name="channel_general">সাধারণ নোটিফিকেশন</string>

@@ -275,6 +275,11 @@ class SyncManager(
                     odometerKm = prefs.odometerKm.toDouble().takeIf { prefs.odometerAdopted },
                     nextServiceKm = prefs.nextServiceKm.takeIf { it > 0f }?.toDouble(),
                     speedLimitKmh = prefs.speedLimitKmh.takeIf { prefs.deviceStateAdopted },
+                    // Parked-since (v1.2.42) is derived live from fixes, so it is
+                    // never gated on deviceStateAdopted: a fresh install's 0
+                    // simply means "moving". Sent on every stateDirty patch,
+                    // including the move to 0 when the bike rides off again.
+                    parkedSinceMs = prefs.parkedSinceMs,
                 )
                 val res = api.patchDeviceState(prefs.deviceId, patch)
                 if (res.ok) prefs.stateDirty = false else fail("patch: ${res.error}")

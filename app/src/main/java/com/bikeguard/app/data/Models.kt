@@ -25,6 +25,10 @@ data class DeviceDto(
     @SerialName("odometer_km") val odometerKm: Double? = null,
     @SerialName("next_service_km") val nextServiceKm: Double? = null,
     @SerialName("speed_limit_kmh") val speedLimitKmh: Int? = null,
+    /** When the bike last stopped moving, wall-clock ms; 0 = moving (v1.2.42).
+     *  Published on every stateDirty patch so the Remote Dashboard can count
+     *  down to the guard arming itself. */
+    @SerialName("parked_since_ms") val parkedSinceMs: Long = 0,
 )
 
 /** What the tracker phone mirrors to its device row. */
@@ -43,6 +47,10 @@ data class DeviceStatePatch(
     @SerialName("odometer_km") val odometerKm: Double? = null,
     @SerialName("next_service_km") val nextServiceKm: Double? = null,
     @SerialName("speed_limit_kmh") val speedLimitKmh: Int? = null,
+    /** When the bike last stopped moving, wall-clock ms; 0 = moving (v1.2.42).
+     *  Derived live from fixes, so it is never gated on deviceStateAdopted:
+     *  a fresh install's 0 simply means "moving", which is the safe value. */
+    @SerialName("parked_since_ms") val parkedSinceMs: Long? = null,
 )
 
 @Serializable

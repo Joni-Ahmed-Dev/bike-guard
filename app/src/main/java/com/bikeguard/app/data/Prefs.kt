@@ -307,6 +307,16 @@ class Prefs(private val context: Context) {
     var lastDiagReportOk: Boolean
         get() = sp.getBoolean("last_diag_ok", false)
         set(v) = sp.edit { putBoolean("last_diag_ok", v) }
+    /** Why the last diagnostics report failed ("timed out", "HTTP 403", "not configured"); "" when it went through. */
+    var lastDiagReportError: String
+        get() = sp.getString("last_diag_error", "") ?: ""
+        set(v) = sp.edit { putString("last_diag_error", v) }
+    /** When the bike last stopped moving, wall-clock ms; 0 = moving (v1.2.42).
+     *  Published to the server so the Remote Dashboard can count down to the
+     *  guard arming itself. Derived live from fixes, never adopted from the server. */
+    var parkedSinceMs: Long
+        get() = sp.getLong("parked_since_ms", 0L)
+        set(v) = sp.edit { putLong("parked_since_ms", v) }
 
     // ---- v1.1.0 roles + server-synced settings ----
     /** "" = not picked yet, ROLE_TRACKER or ROLE_REMOTE. */

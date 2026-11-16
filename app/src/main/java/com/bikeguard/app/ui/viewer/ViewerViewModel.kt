@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.bikeguard.app.BikeGuardApp
 import com.bikeguard.app.BuildConfig
 import com.bikeguard.app.R
+import com.bikeguard.app.data.AppLog
 import com.bikeguard.app.data.DeviceDto
 import com.bikeguard.app.data.GeofenceDto
 import com.bikeguard.app.data.LocationDto
@@ -250,9 +251,11 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
                 val cid = app.api.sendCommand(id, type, arg)
                 if (cid == null) {
                     // The server refused the insert: nothing is queued on the tracker side.
+                    AppLog.i("cmd", "$type failed")
                     if (trackingTo != null) trackingPendingTo = null
                     commandNote = R.string.cmd_failed; return@launch
                 }
+                AppLog.i("cmd", "$type sent")
                 commandNote = R.string.cmd_sent
                 // A command addressed to a device that is no longer watched must
                 // not sit as "sent, not confirmed" forever: once its freshness
@@ -297,6 +300,7 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
                 // tracker applies it when it next polls, so this is not a failed send.
                 commandNote = R.string.cmd_queued
             } catch (e: IOException) {
+                AppLog.i("cmd", "$type failed")
                 if (trackingTo != null) trackingPendingTo = null
                 commandNote = R.string.cmd_failed
             }

@@ -140,7 +140,11 @@ fun DiagnosticsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 stringResource(R.string.diag_last_report),
                 if (prefs.lastDiagReportAtMs == 0L) stringResource(R.string.diag_never)
                 else fmtHourMin(prefs.lastDiagReportAtMs) + " " +
-                    stringResource(if (prefs.lastDiagReportOk) R.string.diag_ok else R.string.diag_failed_short),
+                    if (prefs.lastDiagReportOk) stringResource(R.string.diag_ok)
+                    // The failure reason (v1.2.42): "13:01 Failed (timed out)"
+                    // says what went wrong instead of blaming the connection.
+                    else stringResource(R.string.diag_failed_short) +
+                        (prefs.lastDiagReportError.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""),
             )
         }
         Button(

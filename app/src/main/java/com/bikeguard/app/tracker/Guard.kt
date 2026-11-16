@@ -24,8 +24,17 @@ import kotlin.math.roundToInt
 /**
  * Everything the tracker watches besides position: parking mode, tamper signals, crash detection,
  * speed limit, odometer and the service reminder. Owned by [TrackingService].
+ * [onWakeMotion]: called on every accelerometer motion while armed, even inside the motion
+ * alert's cooldown (v1.2.42) — the service uses it to wake GPS after parking switched it off.
+ * [onAutoArmed]: called right after the guard arms itself (v1.2.42) — the service uses it
+ * to push guardArmed to the server settings row, so a later Remote settings save cannot undo it.
  */
-class Guard(private val ctx: Context, private val app: BikeGuardApp) : SensorGuard.Listener {
+class Guard(
+    private val ctx: Context,
+    private val app: BikeGuardApp,
+    private val onWakeMotion: (() -> Unit)? = null,
+    private val onAutoArmed: (() -> Unit)? = null,
+) : SensorGuard.Listener {
     private val prefs get() = app.prefs
     private val sensors = SensorGuard(ctx, this)
     private val cooldowns = HashMap<String, Long>()
@@ -35,6 +44,9 @@ class Guard(private val ctx: Context, private val app: BikeGuardApp) : SensorGua
 
     private var armedSeen = false
     private var anchor: Location? = null
+    /** True once the guard anchor (the parked spot) is set; false while the
+     *  guard is unarmed or has not seen a fix since arming (v1.2.42). */
+    val hasAnchor: Boolean get() = armedSeen
     private var prev: Location? = null
     private var overSpeed = 0
     private var recentFastAt = -1_000_000L
@@ -146,10 +158,18 @@ class Guard(private val ctx: Context, private val app: BikeGuardApp) : SensorGua
                     if (prefs.sirenOnAlert) SirenPlayer.start(ctx, 30)
                 }
             }
-        } else if (prefs.autoArm && stationaryFor >= 5 * 60_000L && !isLive()
+        } else if (prefs.masterOn && stationaryFor >= 5 * 60_000L
             && System.currentTimeMillis() - prefs.manualDisarmAtMs >= TrackingService.DISARM_LATCH_MS
             && insideScheduleWindow()) {
+            // Auto-arm (v1.2.42): the master switch no longer arms the guard at
+            // once — it arms itself 5 minutes after the bike stops. The old
+            // autoArm pref gate is gone; the master switch is the gate now.
+            // No isLive() gate: live mode must not delay the guard.
             GuardControl.setArmed(ctx, true)
+            // Tell the server row too: a later Remote settings save bumps
+            // updated_at, and applySettings would otherwise re-apply the
+            // stale guardArmed=false and silently disarm us.
+            onAutoArmed?.invoke()
             // The owner is told the guard armed itself; movement while armed never disarms.
             raise("auto_armed", "info")
         }
@@ -195,7 +215,13 @@ class Guard(private val ctx: Context, private val app: BikeGuardApp) : SensorGua
     // ---------- accelerometer callbacks ----------
 
     override fun onMotion() {
-        if (!prefs.parkingArmed || !cooled("motion", 2 * 60_000L)) return
+        if (!prefs.parkingArmed) return
+        // Parked with GPS off (v1.2.42): motion wakes GPS even when the alert
+        // itself is still inside its 2 minute cooldown, so a real move is
+        // measured against the anchor at once instead of waiting for the
+        // next scheduled fix.
+        onWakeMotion?.invoke()
+        if (!cooled("motion", 2 * 60_000L)) return
         AppLog.i("guard", "motion")
         raise("motion", "warning")
         goLive(5)

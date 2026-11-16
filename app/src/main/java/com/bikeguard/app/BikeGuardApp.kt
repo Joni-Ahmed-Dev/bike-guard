@@ -48,6 +48,7 @@ class BikeGuardApp : Application() {
     override fun onCreate() {
         super.onCreate()
         AppLog.init(this)
+        AppLog.i("app", "started v" + BuildConfig.VERSION_NAME)
         prefs = Prefs(this)
         api = SupabaseApi(prefs)
         db = AppDatabase.get(this)

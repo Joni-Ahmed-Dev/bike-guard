@@ -115,11 +115,8 @@ fun IntervalPanel(vm: AppViewModel) {
 @Composable
 fun GuardPanel(vm: AppViewModel) {
     val prefs = LocalContext.current.bikeApp.prefs
-    var autoArm by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.autoArm ?: prefs.autoArm) }
     var siren by remember(vm.remoteSettings) { mutableStateOf(vm.remoteSettings?.sirenOnAlert ?: prefs.sirenOnAlert) }
     ExpandablePanel(Icons.Default.Lock, stringResource(R.string.set_guard)) {
-        SwitchRow(stringResource(R.string.guard_auto), null, autoArm, onChange = { autoArm = it; prefs.autoArm = it; vm.pushSettingsPatch(autoArm = it) }, icon = Icons.Default.Shield)
-        SettingsDivider()
         SwitchRow(stringResource(R.string.guard_siren), null, siren, onChange = { siren = it; prefs.sirenOnAlert = it; vm.pushSettingsPatch(sirenOnAlert = it) }, icon = Icons.Default.NotificationsActive)
     }
 }

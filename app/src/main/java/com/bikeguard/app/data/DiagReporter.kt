@@ -14,6 +14,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /** Reports what is happening inside the app to the bikeguard-diag Worker,
@@ -39,9 +40,11 @@ class DiagReporter(
     private val dao: PendingDao,
 ) {
     private val http = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .writeTimeout(10, TimeUnit.SECONDS)
+        // 30 s, not 10 (v1.2.42): on a slow connection the report itself
+        // timed out and the owner only ever saw "Failed".
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
     val configured: Boolean get() =
@@ -81,6 +84,8 @@ class DiagReporter(
             lastHttpCode = 0
             prefs.lastDiagReportAtMs = System.currentTimeMillis()
             prefs.lastDiagReportOk = false
+            prefs.lastDiagReportError = "not configured"
+            AppLog.i("diag", "report failed: not configured")
             return ReportOutcome.NOT_CONFIGURED
         }
         val now = System.currentTimeMillis()
@@ -129,12 +134,27 @@ class DiagReporter(
             lastOutcome = outcome
             prefs.lastDiagReportAtMs = now
             prefs.lastDiagReportOk = outcome == ReportOutcome.SENT
+            // The failure reason (v1.2.42): a bare "Failed" never said why,
+            // so the Diagnostics screen shows it next to the time.
+            prefs.lastDiagReportError = when (outcome) {
+                ReportOutcome.SENT -> ""
+                ReportOutcome.REJECTED -> "HTTP $lastHttpCode"
+                else -> ""
+            }
+            if (outcome == ReportOutcome.REJECTED) AppLog.i("diag", "report rejected: HTTP $lastHttpCode")
             outcome
         } catch (e: Exception) {
             lastOutcome = ReportOutcome.FAILED
             lastHttpCode = 0
             prefs.lastDiagReportAtMs = now
             prefs.lastDiagReportOk = false
+            val reason = when (e) {
+                is java.net.SocketTimeoutException -> "timed out"
+                is IOException -> "no internet"
+                else -> e.message?.take(60) ?: (e::class.simpleName ?: "failed")
+            }
+            prefs.lastDiagReportError = reason
+            AppLog.i("diag", "report failed: $reason")
             ReportOutcome.FAILED
         }
     }

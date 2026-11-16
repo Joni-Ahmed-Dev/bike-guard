@@ -182,7 +182,7 @@ class SupabaseApi(private val prefs: Prefs) {
 
     /** Throws IOException when offline; returns null on an HTTP error. */
     suspend fun listDevices(): List<DeviceDto>? {
-        val r = authed { builder("/rest/v1/devices?select=id,name,last_seen,armed,odometer_km,next_service_km,speed_limit_kmh&order=created_at.asc", it).get().build() }
+        val r = authed { builder("/rest/v1/devices?select=id,name,last_seen,armed,odometer_km,next_service_km,speed_limit_kmh,parked_since_ms&order=created_at.asc", it).get().build() }
         return if (r.ok) runCatching { json.decodeFromString(ListSerializer(DeviceDto.serializer()), r.body) }.getOrNull() else null
     }
 

@@ -62,7 +62,6 @@ fun TrackerNoticePanel() {
 @Composable
 fun TrackerReadOnlyPanel(vm: AppViewModel) {
     val prefs = LocalContext.current.bikeApp.prefs
-    val autoArm = remember(vm.remoteSettings) { vm.remoteSettings?.autoArm ?: prefs.autoArm }
     val crash = remember(vm.remoteSettings) { vm.remoteSettings?.crashEnabled ?: prefs.crashDetection }
     val number = remember(vm.remoteSettings) { vm.remoteSettings?.sosNumber ?: prefs.emergencyNumber }
     val limit = remember(vm.remoteSettings) { vm.remoteSettings?.speedLimitKmh ?: prefs.speedLimitKmh }
@@ -79,8 +78,6 @@ fun TrackerReadOnlyPanel(vm: AppViewModel) {
         ReadOnlyRow(stringResource(R.string.limit_title), if (limit == 0) stringResource(R.string.limit_off) else stringResource(R.string.limit_kmh, limit), icon = Icons.Default.Speed)
         SettingsDivider()
         ReadOnlyRow(stringResource(R.string.guard_parking), if (prefs.parkingArmed) stringResource(R.string.ctl_arm) else stringResource(R.string.ctl_disarm), icon = Icons.Default.LocalParking)
-        SettingsDivider()
-        ReadOnlyRow(stringResource(R.string.guard_auto), if (autoArm) stringResource(R.string.ctl_arm) else stringResource(R.string.ctl_disarm), icon = Icons.Default.Shield)
         SettingsDivider()
         ReadOnlyRow(stringResource(R.string.safety_crash), if (crash) stringResource(R.string.ctl_arm) else stringResource(R.string.ctl_disarm), icon = Icons.Default.CarCrash)
         SettingsDivider()
