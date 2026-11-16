@@ -87,7 +87,7 @@ object UpdateChecker {
             val tag = json["tag_name"]?.jsonPrimitive?.content ?: return null
             val url = json["html_url"]?.jsonPrimitive?.content ?: return null
             val latest = tag.trimStart('v')
-            if (isNewer(latest, BuildConfig.VERSION_NAME)) {
+            return if (isNewer(latest, BuildConfig.VERSION_NAME)) {
                 UpdateCheckResult.Available(UpdateInfo(latest, url, apkUrl(json)))
             } else {
                 UpdateCheckResult.UpToDate
