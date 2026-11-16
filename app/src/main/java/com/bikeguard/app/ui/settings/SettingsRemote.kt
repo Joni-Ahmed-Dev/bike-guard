@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -41,12 +40,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.bikeguard.app.R
 import com.bikeguard.app.bikeApp
-import com.bikeguard.app.data.MODE_ALWAYS
-import com.bikeguard.app.data.MODE_AUTO
-import com.bikeguard.app.data.MODE_MANUAL
 import com.bikeguard.app.data.Perms
 import com.bikeguard.app.data.isoToMs
-import com.bikeguard.app.tracker.AutoMode
 import com.bikeguard.app.ui.AppViewModel
 import com.bikeguard.app.ui.agoText
 import com.bikeguard.app.ui.theme.Palette
@@ -93,39 +88,9 @@ fun SyncStatusPanel(vm: AppViewModel, now: Long) {
     }
 }
 
-// ---- tracking mode ----
-@Composable
-fun ModePanel(vm: AppViewModel) {
-    val ctx = LocalContext.current
-    var autoDenied by remember { mutableStateOf(false) }
-    val segColors = rememberSegColors()
-    val activityPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        autoDenied = !ok
-        if (ok) vm.updateMode(MODE_AUTO)
-    }
-    fun pickMode(m: String) {
-        if (m == MODE_AUTO && !AutoMode.hasPermission(ctx)) activityPerm.launch(Manifest.permission.ACTIVITY_RECOGNITION)
-        else { autoDenied = false; vm.updateMode(m) }
-    }
-    ExpandablePanel(Icons.Default.Tune, stringResource(R.string.set_mode)) {
-        val modes = listOf(MODE_MANUAL to R.string.mode_manual, MODE_AUTO to R.string.mode_auto, MODE_ALWAYS to R.string.mode_always)
-        // 48dp rows (v1.2.20): the Material3 default segmented row is 40dp.
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().height(48.dp)) {
-            modes.forEachIndexed { i, (value, label) ->
-                SegmentedButton(
-                    selected = vm.mode == value, onClick = { pickMode(value) },
-                    shape = SegmentedButtonDefaults.itemShape(i, modes.size), colors = segColors,
-                ) { Text(stringResource(label)) }
-            }
-        }
-        Spacer(Modifier.height(10.dp))
-        Text(stringResource(R.string.mode_hint), color = Palette.Muted, style = MaterialTheme.typography.bodyMedium)
-        if (autoDenied) {
-            Spacer(Modifier.height(6.dp))
-            Text(stringResource(R.string.auto_perm_needed), color = Palette.Danger, style = MaterialTheme.typography.bodyMedium)
-        }
-    }
-}
+// Tracking mode picker removed (v1.2.40): the master switch decides everything
+// now, so Manual/Auto/Always no longer change anything. The pref, the server
+// sync and AutoMode stay in place, dormant, in case the modes come back.
 
 // ---- interval ----
 @Composable

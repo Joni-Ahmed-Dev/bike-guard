@@ -102,6 +102,18 @@ class Prefs(private val context: Context) {
     var trackingActive: Boolean
         get() = sp.getBoolean("tracking_active", false)
         set(v) = sp.edit { putBoolean("tracking_active", v) }
+
+    /**
+     * Master switch (v1.2.40): the one shared tracking button on both phones.
+     * ON means everything on (tracking, guard, live); OFF means everything off,
+     * no exception for Always-on mode or an armed guard. Unset (first run after
+     * the update) it takes the current tracking state, so the switch never flips
+     * on its own. Kept in step with trackingActive and parkingArmed by the
+     * master paths, so the three never disagree.
+     */
+    var masterOn: Boolean
+        get() = sp.getBoolean("master_on", trackingActive)
+        set(v) = sp.edit { putBoolean("master_on", v) }
     /** When the current tracking session started, millis since epoch; 0 = not tracking.
      * Stamped only on the not-tracking -> tracking transition and cleared only on an
      * explicit stop, so the elapsed time survives a service restart and a phone reboot. */
@@ -394,7 +406,10 @@ class Prefs(private val context: Context) {
 
     val isLoggedIn: Boolean get() = !refreshToken.isNullOrEmpty()
     /** The Remote phone never tracks, even if an old install left tracking prefs behind. */
-    val shouldTrack: Boolean get() = isLoggedIn && !isRemote && (trackingActive || mode == MODE_ALWAYS || parkingArmed)
+    /** Master switch (v1.2.40): the switch alone decides whether the bike is
+     *  watched. Mode and guard no longer start tracking on their own — they
+     *  follow the switch, so OFF always means off. */
+    val shouldTrack: Boolean get() = isLoggedIn && !isRemote && masterOn
 
     /** True when the session died on its own (refresh token rejected) and the owner
      *  has not been told yet. Survives clearSession() on purpose: the flag is what

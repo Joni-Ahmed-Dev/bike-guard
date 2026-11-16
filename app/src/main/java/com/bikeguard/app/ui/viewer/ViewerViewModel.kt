@@ -231,8 +231,8 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
         val id = selectedId ?: return
         if (sendJob?.isActive == true) { commandNote = R.string.cmd_sending; return } // one command at a time; rapid taps don't race
         val trackingTo = when (type) {
-            "tracking_start" -> true
-            "tracking_stop" -> false
+            "tracking_start", "master_on" -> true
+            "tracking_stop", "master_off" -> false
             else -> null
         }
         if (trackingTo != null) {

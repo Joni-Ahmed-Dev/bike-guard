@@ -259,16 +259,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun updateMode(m: String) {
-        mode = m
-        app.prefs.mode = m
-        pushSettingsPatch(mode = m)
-        if (app.prefs.isRemote) return // the Remote phone never tracks; the mode is for the bike
-        // Leaving Always-on: keep the current run going, but it is user/auto-controlled from now on.
-        if (m == MODE_ALWAYS) app.tryStartTracking() else app.prefs.trackingActive = TrackerState.running.value
-        if (m == MODE_AUTO) AutoMode.enable(app) else AutoMode.disable(app)
-    }
-
     fun setInterval(sec: Int) {
         intervalSec = sec
         app.prefs.intervalSec = sec

@@ -164,7 +164,9 @@ fun TrackerScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
                     }
                     Spacer(Modifier.width(12.dp))
                     Switch(
-                        checked = armed, onCheckedChange = { GuardControl.setArmed(ctx, it) },
+                        // Master switch (v1.2.40): the parking toggle is the same
+                        // one button — it turns everything on or off.
+                        checked = armed, onCheckedChange = { vm.setTracking(it) },
                         colors = SwitchDefaults.colors(checkedTrackColor = Palette.Ember, checkedThumbColor = Palette.Ink),
                     )
                 }

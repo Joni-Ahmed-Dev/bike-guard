@@ -41,6 +41,8 @@ class Guard(private val ctx: Context, private val app: BikeGuardApp) : SensorGua
 
     fun isLive() = System.currentTimeMillis() < liveUntil
     fun goLive(minutes: Int) { liveUntil = System.currentTimeMillis() + minutes * 60_000L }
+    /** Master switch OFF (v1.2.40): live ends at once instead of running out its 15 minutes. */
+    fun endLive() { liveUntil = 0L }
 
     private fun cooled(key: String, ms: Long): Boolean {
         val now = SystemClock.elapsedRealtime()

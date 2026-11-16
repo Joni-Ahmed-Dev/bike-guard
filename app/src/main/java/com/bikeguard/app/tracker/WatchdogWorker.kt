@@ -37,11 +37,16 @@ class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             val revive = runCatching {
                 val cmds = app.api.pendingCommands(app.prefs.deviceId).orEmpty()
                 val freshStart = cmds.any { c ->
-                    (c.type == "tracking_start" || c.type == "arm") &&
+                    (c.type == "tracking_start" || c.type == "arm" || c.type == "master_on") &&
                         // Server-computed age (v1.2.8): a wrong phone clock cannot expire it.
                         c.ageMs < TrackingService.freshWindowMs(c.type)
                 }
-                val guardArmed = runCatching { app.api.getDeviceSettings(app.prefs.deviceId)?.guardArmed }.getOrNull() == true
+                // A stale guardArmed row must never revive a tracker whose master
+                // switch is OFF (v1.2.40): the master_off patch can still be in
+                // flight when the Watchdog runs, so the mirrored switch has to
+                // agree. Unknown (null) keeps the old behaviour.
+                val guardArmed = runCatching { app.api.getDeviceSettings(app.prefs.deviceId)?.guardArmed }.getOrNull() == true &&
+                    runCatching { app.api.trackingExpected(app.prefs.deviceId) }.getOrNull() != false
                 freshStart || guardArmed
             }.getOrNull() == true
             if (revive && !app.tryStartTracking()) notifyResume(app)

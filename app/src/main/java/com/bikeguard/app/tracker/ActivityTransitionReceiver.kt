@@ -17,6 +17,9 @@ class ActivityTransitionReceiver : BroadcastReceiver() {
         val result = ActivityTransitionResult.extractResult(intent) ?: return
         val app = context.bikeApp
         if (app.prefs.mode != MODE_AUTO || !app.prefs.isLoggedIn || !Perms.hasFine(context)) return
+        // Master switch OFF (v1.2.40): a moving bike must not switch the watch
+        // back on by itself.
+        if (!app.prefs.masterOn) return
         val entered = result.transitionEvents.any {
             it.activityType == DetectedActivity.IN_VEHICLE && it.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER
         }

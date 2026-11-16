@@ -74,7 +74,8 @@ fun ViewerControls(vm: ViewerViewModel) {
             ControlButton(
                 if (armed) Icons.Default.LockOpen else Icons.Default.Lock, if (armed) R.string.ctl_disarm else R.string.ctl_arm,
                 Modifier.weight(1f), tint = if (armed) Palette.Signal else Palette.Leaf,
-            ) { vm.send(if (armed) "disarm" else "arm") }
+                // Master switch (v1.2.40): same one button as the Dashboard switch.
+            ) { vm.send(if (armed) "master_off" else "master_on") }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ControlButton(Icons.Default.Share, R.string.ctl_share, Modifier.weight(1f)) { showShare = true }

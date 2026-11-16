@@ -110,6 +110,9 @@ fun DashboardScreen(
 
     // Remote tracking switch: the tracker's own mirrored flag, polled while this screen is open.
     // Null = not known yet, so the switch stays disabled until the first read.
+    // 5 s, not 15 (v1.2.40): the master switch must feel like one button on both
+    // phones, so a tap on the bike phone shows up here almost at once. One
+    // lightweight select per poll; the 15 s device refresh still covers the rest.
     val isRemote = ctx.bikeApp.prefs.isRemote
     var remoteTrackingOn by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(vm.selectedId) {
@@ -122,7 +125,7 @@ fun DashboardScreen(
                     if (vm.trackingPendingTo == it) vm.clearTrackingPending()
                 }
             } catch (e: IOException) { }
-            delay(15_000)
+            delay(5_000)
         }
     }
 
@@ -193,7 +196,9 @@ fun DashboardScreen(
                 QuickButton(
                     if (armed) R.string.ctl_disarm else R.string.ctl_arm,
                     if (armed) Icons.Default.LockOpen else Icons.Default.Lock, Color(0xFFBCD9F9), Modifier.weight(1f),
-                ) { vm.send(if (armed) "disarm" else "arm") }
+                    // Master switch (v1.2.40): the guard button is the same one
+                    // button — it turns everything on or off, not just the guard.
+                ) { vm.send(if (armed) "master_off" else "master_on") }
             }
             vm.commandNote?.let {
                 Spacer(Modifier.height(8.dp))
@@ -224,7 +229,7 @@ fun DashboardScreen(
                         enabled = remoteTrackingOn != null && device != null,
                         onCheckedChange = { on ->
                             remoteTrackingOn = on // optimistic; the pending state holds it until the tracker confirms
-                            vm.send(if (on) "tracking_start" else "tracking_stop")
+                            vm.send(if (on) "master_on" else "master_off")
                         },
                         colors = SwitchDefaults.colors(
                             checkedTrackColor = Palette.Ember,

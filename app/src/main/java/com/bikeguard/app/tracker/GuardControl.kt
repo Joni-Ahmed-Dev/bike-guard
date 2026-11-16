@@ -3,7 +3,9 @@ package com.bikeguard.app.tracker
 import android.content.Context
 import com.bikeguard.app.bikeApp
 import com.bikeguard.app.data.PendingEvent
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 
 /** Entry points shared by the service, the UI, the widget and FCM handlers. */
@@ -61,17 +63,40 @@ object GuardControl {
 
 /** Start/stop tracking from places that are not the main UI (widget, Quick Settings tile). */
 object TrackingControl {
+    // The pending stop (below): a fresh ON tap cancels it, so a quick off/on
+    // can never stop tracking that was just switched back on.
+    private var stopJob: Job? = null
+
+    /**
+     * Master switch (v1.2.40): the one shared button on both phones. ON means
+     * everything on (tracking, guard, live); OFF means everything off — no
+     * exception for Always-on mode or an armed guard. The Remote phone's tap
+     * arrives as a master_on/master_off command and lands here through the
+     * service; this is the local tap (tracker ring, parking toggle, widget).
+     */
     fun set(ctx: Context, on: Boolean) {
-        val prefs = ctx.bikeApp.prefs
+        val app = ctx.bikeApp
+        val prefs = app.prefs
         // The Remote phone never tracks: the widget and tile refuse to start it here.
         if (on && prefs.isRemote) return
-        if (!on && prefs.mode == com.bikeguard.app.data.MODE_ALWAYS) return // Always-on cannot be switched off from here
+        stopJob?.cancel()
+        prefs.masterOn = on
         prefs.trackingActive = on
         if (on) {
+            // Arms the guard, starts tracking and flushes the new state.
+            GuardControl.setArmed(ctx, true)
             ctx.tryStartTracking()
         } else {
-            if (prefs.parkingArmed) GuardControl.setArmed(ctx, false)
-            TrackingService.stop(ctx)
+            // Disarms the guard and clears the anchor.
+            GuardControl.setArmed(ctx, false)
+            app.prefs.trackingStartedAtMs = 0L // explicit stop: the timer ends here
+            // Flush the new state BEFORE the service stops (v1.2.38 lesson):
+            // stopping first kills the scope that would have reported back, so
+            // the Remote's switch would wait for a confirmation that never came.
+            stopJob = app.appScope.launch {
+                withTimeoutOrNull(8_000) { app.sync.flush() }
+                TrackingService.stop(ctx)
+            }
         }
     }
 }

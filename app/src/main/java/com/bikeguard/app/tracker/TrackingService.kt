@@ -202,6 +202,9 @@ class TrackingService : Service() {
         }
         requestUpdates(app.prefs.intervalSec.coerceIn(3, 60) * 1000L)
         TrackerState.running.value = true
+        // Master switch ON (v1.2.40): live starts with the service, so a local
+        // ON tap is live from the first fix, not only after a remote command.
+        if (app.prefs.masterOn && !guard.isLive()) guard.goLive(15)
         // Show the last known position right away instead of dashes while the
         // first real fix is still coming; indoors that can take minutes.
         seedLastKnown(force = true)
@@ -295,6 +298,10 @@ class TrackingService : Service() {
     /** Live mode (from the Viewer, or after a theft alert) overrides the parked/low-battery slow-down. */
     private fun reevaluateInterval() {
         if (!updating) return
+        // Master switch ON (v1.2.40) keeps live mode extended: the live window
+        // is 15 minutes, so re-extend it on every re-evaluation while the
+        // master is on, instead of letting it lapse mid-watch.
+        if (app.prefs.masterOn && !guard.isLive()) guard.goLive(15)
         val base = app.prefs.intervalSec.coerceIn(3, 60) * 1000L
         val wanted = if (guard.isLive()) base
         else AdaptivePolicy.intervalMs(app.prefs.intervalSec, lastStationaryFor, lastBattery, lastCharging)
@@ -445,6 +452,35 @@ class TrackingService : Service() {
                 app.prefs.stateDirty = true // the Remote phone reads this back as tracking_expected
                 tryStartTracking()
             }
+            "master_on" -> {
+                // Master switch ON (v1.2.40): everything on — tracking, guard, live.
+                // The state is set before setArmed, so the flush it launches
+                // already reads the new master value.
+                app.prefs.masterOn = true
+                app.prefs.trackingActive = true
+                app.prefs.stateDirty = true
+                GuardControl.setArmed(this, true)
+                guard.goLive(15)
+                reevaluateInterval()
+                tryStartTracking()
+                pushSettingsToServer(guardArmed = true)
+            }
+            "master_off" -> {
+                // Master switch OFF (v1.2.40): everything off, no exceptions.
+                app.prefs.masterOn = false
+                app.prefs.trackingActive = false
+                app.prefs.trackingStartedAtMs = 0L // explicit stop: the timer ends here
+                app.prefs.stateDirty = true
+                GuardControl.setArmed(this, false)
+                guard.endLive()
+                SirenPlayer.stop(this)
+                pushSettingsToServer(guardArmed = false)
+                // Push the new state to the server BEFORE the service stops (v1.2.38):
+                // stopService() kills the scope that would have flushed the mirror
+                // patch, so the Remote's switch waited for a confirmation that never came.
+                withTimeoutOrNull(8_000) { app.sync.flush() }
+                TrackingService.stop(this)
+            }
             "tracking_stop" -> {
                 // Refused while the guard is armed, or in Always-on mode: stopping would
                 // kill the monitoring the owner still expects, so the service keeps running.
@@ -502,7 +538,7 @@ class TrackingService : Service() {
         if (s.mode in listOf("manual", "auto", "always") && s.mode != p.mode) {
             p.mode = s.mode
             if (s.mode == MODE_AUTO) AutoMode.enable(app) else AutoMode.disable(app)
-            if (s.mode == MODE_ALWAYS) tryStartTracking()
+            if (s.mode == MODE_ALWAYS && p.masterOn) tryStartTracking()
             else p.trackingActive = TrackerState.running.value
         }
         if (s.intervalSec in 3..60 && s.intervalSec != p.intervalSec) {
@@ -544,7 +580,11 @@ class TrackingService : Service() {
      */
     private fun pushSettingsToServer(guardArmed: Boolean? = null, speedLimitKmh: Int? = null) {
         val p = app.prefs
-        scope.launch {
+        // Application scope, not the service scope (v1.2.40): the master_off
+        // path stops the service right after this call, and a patch launched
+        // in the service scope would die with it — leaving a stale guardArmed
+        // row that the Watchdog would revive the tracker on.
+        app.appScope.launch {
             // No settings row seen from the server yet: there is nothing to patch, and an
             // upsert here could wipe a schedule the Remote phone set.
             if (lastSettingsSeenMs == 0L) {
@@ -660,7 +700,7 @@ class TrackingService : Service() {
         const val FRESH_START_MS = 60 * 60_000L
         /** How long a command of [type] stays executable after it was sent. */
         fun freshWindowMs(type: String?): Long =
-            if (type == "tracking_start" || type == "arm") FRESH_START_MS else FRESH_COMMAND_MS
+            if (type == "tracking_start" || type == "arm" || type == "master_on") FRESH_START_MS else FRESH_COMMAND_MS
         const val ACTION_POLL = "com.bikeguard.app.POLL_COMMANDS"
 
         /** Safe to call repeatedly; also re-applies a changed interval. Throws if Android forbids a background start. */

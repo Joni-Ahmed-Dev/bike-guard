@@ -129,7 +129,6 @@ fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
 
         // ---- editable settings: Remote only ----
         if (isRemote) {
-            ModePanel(vm)
             IntervalPanel(vm)
             GuardPanel(vm)
             SafetyPanel(vm)
