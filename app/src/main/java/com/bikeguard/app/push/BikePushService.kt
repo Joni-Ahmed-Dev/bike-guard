@@ -4,7 +4,6 @@ import com.bikeguard.app.bikeApp
 import com.bikeguard.app.data.AppLog
 import com.bikeguard.app.tracker.Notifier
 import com.bikeguard.app.tracker.TrackingService
-import com.bikeguard.app.tracker.tryStartTracking
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.launch
@@ -32,8 +31,18 @@ class BikePushService : FirebaseMessagingService() {
         when (d["kind"]) {
             "event" -> Notifier.event(this, d)
             "command" -> {
-                app.prefs.trackingActive = true
-                if (tryStartTracking()) TrackingService.pollCommands(this)
+                // C3: never start tracking from a push. The Remote phone
+                // ignores command pushes entirely; the tracker only wakes
+                // to poll, and the service starts GPS only after a
+                // master_on command sets the master switch on. Poll only
+                // (no plain start): a plain start would restart GPS on a
+                // parked and armed tracker, defeating the GPS off state.
+                // pollCommands starts the service itself when it is down.
+                if (app.prefs.isRemote) {
+                    AppLog.i("push", "cmd ignored remote")
+                } else {
+                    runCatching { TrackingService.pollCommands(this) }
+                }
             }
         }
     }

@@ -349,6 +349,14 @@ class Prefs(private val context: Context) {
     var lastGuardChangeMs: Long
         get() = sp.getLong("last_guard_change_ms", 0L)
         set(v) = sp.edit { putLong("last_guard_change_ms", v) }
+    /** A guard_armed value that still has to reach the server's device_settings row
+     *  (audit C1, v1.2.44): the local master OFF disarms at once, but its PATCH can
+     *  fail while offline or before any settings row was seen. Null = nothing
+     *  pending. Cleared only by a successful PATCH, so it survives process death
+     *  and is retried by syncSettings and the Watchdog. */
+    var pendingGuardArmed: Boolean?
+        get() = sp.getString("pending_guard_armed", null)?.toBooleanStrictOrNull()
+        set(v) = sp.edit { if (v == null) remove("pending_guard_armed") else putString("pending_guard_armed", v.toString()) }
     /** Guard schedule from the server: hours 0-23, -1 = no schedule. */
     var guardScheduleStart: Int
         get() = sp.getInt("sched_start", -1)
@@ -447,5 +455,8 @@ class Prefs(private val context: Context) {
         // A pending SOS belongs to the old session: a signed-out phone must
         // never text the old emergency contact after the countdown outlives it.
         remove("sos_pending_until"); remove("sos_pending_lat"); remove("sos_pending_lng")
+        // Same for a pending guard_armed mirror: sign-out disarms the guard, so
+        // a PATCH queued under the old session must never land on the next one.
+        remove("pending_guard_armed")
     }
 }

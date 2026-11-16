@@ -1,6 +1,7 @@
 package com.bikeguard.app.tracker
 
 import android.content.Context
+import com.bikeguard.app.BikeGuardApp
 import com.bikeguard.app.bikeApp
 import com.bikeguard.app.data.AppLog
 import com.bikeguard.app.data.PendingEvent
@@ -8,6 +9,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
+import java.io.IOException
 
 /** Entry points shared by the service, the UI, the widget and FCM handlers. */
 object GuardControl {
@@ -37,6 +39,31 @@ object GuardControl {
         if (!on && latch) app.prefs.manualDisarmAtMs = System.currentTimeMillis()
         if (on) { app.prefs.trackingActive = true; ctx.tryStartTracking() }
         app.appScope.launch { app.sync.flush() }   // tell the server right away when online
+    }
+
+    /**
+     * Audit C1 (v1.2.44): flush a pending guard_armed value to the device_settings row.
+     * The PATCH is field-scoped (patchTrackerSettings) and never bumps updated_at, so it
+     * cannot look like new Remote work. A filtered PATCH on a missing row succeeds
+     * without writing anything, so unless the caller already knows a row exists
+     * ([rowExists]) the row is checked first: a missing row or any failed check leaves
+     * the value pending for the next syncSettings poll or Watchdog tick. Returns true
+     * when nothing is pending or the PATCH succeeded. The flag is cleared only when
+     * the value still pending is the one just patched, so a newer arm/disarm queued
+     * meanwhile is never dropped.
+     */
+    suspend fun flushPendingGuardArmed(app: BikeGuardApp, rowExists: Boolean = false): Boolean {
+        val pending = app.prefs.pendingGuardArmed ?: return true
+        if (!rowExists) {
+            val exists = try { app.api.deviceSettingsRowExists(app.prefs.deviceId) } catch (e: IOException) { null }
+            if (exists != true) return false
+        }
+        val ok = app.api.patchTrackerSettings(app.prefs.deviceId, pending, null)
+        if (ok && app.prefs.pendingGuardArmed == pending) {
+            app.prefs.pendingGuardArmed = null
+            AppLog.i("guard", "pending guard patch sent")
+        }
+        return ok
     }
 
     /** Queue an alert in Room (so it survives being offline) and try to upload it now. */
@@ -92,6 +119,9 @@ object TrackingControl {
             // Live starts with the service (beginUpdates goes live while the
             // master is on), so no guard call is needed here.
             prefs.manualDisarmAtMs = 0L
+            // A pending guard_armed=false from an earlier OFF is superseded by
+            // this ON: the guard will push its own value when it auto-arms.
+            prefs.pendingGuardArmed = null
             prefs.stateDirty = true
             ctx.tryStartTracking()
             app.appScope.launch { app.sync.flush() }
@@ -99,6 +129,16 @@ object TrackingControl {
             // Disarms the guard and clears the anchor.
             GuardControl.setArmed(ctx, false)
             app.prefs.trackingStartedAtMs = 0L // explicit stop: the timer ends here
+            // Audit C1: the devices-row mirror flushed below never touches
+            // device_settings.guard_armed, so a Remote settings edit afterwards
+            // silently re-armed the tracker. Persist the disarm for the settings
+            // row too and try the PATCH at once; while offline it stays pending
+            // and syncSettings / the Watchdog retry it. The Remote phone owns no
+            // guard_armed row for its own device id, so it records nothing.
+            if (!prefs.isRemote) {
+                prefs.pendingGuardArmed = false
+                app.appScope.launch { GuardControl.flushPendingGuardArmed(app) }
+            }
             // Flush the new state BEFORE the service stops (v1.2.38 lesson):
             // stopping first kills the scope that would have reported back, so
             // the Remote's switch would wait for a confirmation that never came.

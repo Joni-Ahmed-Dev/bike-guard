@@ -206,16 +206,21 @@ fun DashboardScreen(
             }
             // Guard countdown (v1.2.42): the bike stopped but the guard has not
             // armed itself yet — show how long until it does. `now` ticks every
-            // second, so this counts down live while it is visible.
+            // second, so this counts down live while it is visible. C5 fix: show
+            // it only while the guard can actually arm — master on (null = not
+            // known yet, hide) and the tracker alive (age < 15 min, same bound
+            // as the Offline status). Past zero it hides entirely; the armed
+            // badge is the source of truth after that, never a stuck "Arming…".
             val parkedSinceMs = device?.parkedSinceMs ?: 0L
-            if (device?.armed != true && parkedSinceMs > 0L) {
+            if (device?.armed != true && parkedSinceMs > 0L && remoteTrackingOn == true && age != null && age < 900_000L) {
                 val remainingMs = parkedSinceMs + 5 * 60_000L - now
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    if (remainingMs <= 0) stringResource(R.string.guard_arming)
-                    else stringResource(R.string.guard_countdown, fmtCountdownMs(remainingMs)),
-                    color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
-                )
+                if (remainingMs > 0) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.guard_countdown, fmtCountdownMs(remainingMs)),
+                        color = Palette.Muted, style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
         }
 

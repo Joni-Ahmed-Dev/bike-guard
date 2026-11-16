@@ -80,6 +80,10 @@ class TrackingService : Service() {
     private var lastStationaryFor = 0L
     private var lastWidgetAt = 0L
     private var lastSettingsSeenMs = 0L
+    /** A one-shot locate fix is async: after a locate command with the master
+     * off, the service must stay alive until the fix lands (or this grace
+     * expires), or the end-of-batch stop below kills the upload (C3). */
+    private var locateGraceUntilMs = 0L
 
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -197,7 +201,16 @@ class TrackingService : Service() {
             return START_NOT_STICKY
         }
         if (intent == null) GuardControl.raise(this, "tracker_restarted", "warning")
-        if (intent?.action == ACTION_POLL && updating) {
+        if (intent?.action == ACTION_POLL) {
+            // Poll only, never start GPS: a push wake must not disturb
+            // the parked and armed GPS off state, and a master off wake
+            // must not start tracking. The poll loop runs the commands.
+            pollSignal.trySend(Unit)
+            return START_STICKY
+        }
+        if (!app.prefs.shouldTrack) {
+            // Poll only, no GPS yet: stay alive in foreground so the
+            // incoming command can run, and let execute decide.
             pollSignal.trySend(Unit)
             return START_STICKY
         }
@@ -510,25 +523,34 @@ class TrackingService : Service() {
             if (fresh) execute(c)
             try { app.api.ackCommand(id, if (fresh) "done" else "expired") } catch (e: IOException) { /* retried next poll */ }
         }
+        // C3: do not sit running forever after a master off wake. A batch
+        // that contained master_on leaves shouldTrack true, so this never
+        // fires on the wake that turns tracking on. A locate fix is async,
+        // so the stop waits out the locate grace, or the fix would be lost.
+        if (!app.prefs.shouldTrack && System.currentTimeMillis() >= locateGraceUntilMs) TrackingService.stop(this)
     }
 
     private suspend fun execute(c: CommandDto) {
         AppLog.i("cmd", (c.type ?: "?") + (c.id?.let { " #$it" } ?: "") + (c.arg?.let { " $it" } ?: ""))
         when (c.type) {
-            "locate" -> locateNow()
+            "locate" -> { locateGraceUntilMs = System.currentTimeMillis() + LOCATE_GRACE_MS; locateNow() }
             "live" -> { guard.goLive(15); reevaluateInterval() }
             "siren_on" -> SirenPlayer.start(this, 60)
             "siren_off" -> SirenPlayer.stop(this)
-            "arm" -> { GuardControl.setArmed(this, true); pushSettingsToServer(guardArmed = true) }
+            "arm" -> { if (app.prefs.masterOn) { GuardControl.setArmed(this, true); pushSettingsToServer(guardArmed = true) } else AppLog.i("cmd", "arm ignored: master off") }
             "disarm" -> { GuardControl.setArmed(this, false); SirenPlayer.stop(this); pushSettingsToServer(guardArmed = false) }
             "set_speed_limit" -> { app.prefs.speedLimitKmh = c.arg?.toIntOrNull() ?: 0; app.prefs.stateDirty = true; pushSettingsToServer(speedLimitKmh = app.prefs.speedLimitKmh) }
             "cancel_sos" -> SosController.cancel(this)
             "sos" -> GuardControl.sos(this) // Remote trigger (v1.2.19): same immediate SOS as the Tracker's hold button
             "mark_serviced" -> app.prefs.markServiced()
             "tracking_start" -> {
-                app.prefs.trackingActive = true
-                app.prefs.stateDirty = true // the Remote phone reads this back as tracking_expected
-                tryStartTracking()
+                // C3: a stale start delivered by a wake must not start
+                // tracking while the master switch is off.
+                if (app.prefs.masterOn) {
+                    app.prefs.trackingActive = true
+                    app.prefs.stateDirty = true // the Remote phone reads this back as tracking_expected
+                    tryStartTracking()
+                } else AppLog.i("cmd", "tracking_start ignored master off")
             }
             "master_on" -> {
                 // Master switch ON (v1.2.42): tracking and live start at once,
@@ -590,8 +612,8 @@ class TrackingService : Service() {
         checkGuardSchedule()
         val p = app.prefs
         if (!p.isLoggedIn || p.isRemote) return
-        val s = try { app.api.getDeviceSettings(p.deviceId) } catch (e: IOException) { null }
-        if (s == null) {
+        val s0 = try { app.api.getDeviceSettings(p.deviceId) } catch (e: IOException) { null }
+        if (s0 == null) {
             // No settings row yet (a tracker whose Remote never saved settings):
             // there is nothing to adopt, so the local values are the truth. Mark
             // adopted so the stateDirty patch can mirror them; a fetch error
@@ -602,6 +624,19 @@ class TrackingService : Service() {
                 if (exists == false) { p.deviceStateAdopted = true; p.stateDirty = true }
             }
             return
+        }
+        // Audit C1: a local master OFF while offline leaves guard_armed pending in
+        // Prefs. Flush it now that a row is known to exist, BEFORE applying the
+        // row: the fetched copy may still carry the old armed value, and applying
+        // it first would re-arm the tracker from a Remote edit made while offline.
+        // A successful flush means the server already holds the pending value, so
+        // the row applied below uses it instead of the stale fetched one. This runs
+        // before the unchanged-row early return below, so a pending value is never
+        // skipped just because the Remote made no edit.
+        var s = s0
+        val pending = p.pendingGuardArmed
+        if (pending != null && GuardControl.flushPendingGuardArmed(app, rowExists = true)) {
+            s = s.copy(guardArmed = pending)
         }
         val updatedMs = isoToMs(s.updatedAt.orEmpty())
         if (updatedMs <= lastSettingsSeenMs && updatedMs != 0L) return
@@ -629,8 +664,13 @@ class TrackingService : Service() {
         }
         if (s.speedLimitKmh != p.speedLimitKmh) { p.speedLimitKmh = s.speedLimitKmh; p.stateDirty = true }
         // A server row older than a local arm/disarm on this phone must not undo it.
-        if (s.guardArmed != p.parkingArmed && isoToMs(s.updatedAt.orEmpty()) >= p.lastGuardChangeMs)
-            GuardControl.setArmed(this, s.guardArmed, local = false)
+        // Arm direction only with master ON (C2): a Remote arm while master is OFF
+        // is logged and skipped, with nothing stamped, so a later legitimate arm
+        // is not blocked. Disarm direction stays ungated so a Remote disarm works.
+        if (s.guardArmed != p.parkingArmed && isoToMs(s.updatedAt.orEmpty()) >= p.lastGuardChangeMs) {
+            if (s.guardArmed && !p.masterOn) AppLog.i("guard", "server arm ignored: master off")
+            else GuardControl.setArmed(this, s.guardArmed, local = false)
+        }
         if (s.autoArm != p.autoArm) p.autoArm = s.autoArm
         if (s.sirenOnAlert != p.sirenOnAlert) p.sirenOnAlert = s.sirenOnAlert
         if (s.sosSms != p.sosSms) p.sosSms = s.sosSms
@@ -667,15 +707,25 @@ class TrackingService : Service() {
         // in the service scope would die with it — leaving a stale guardArmed
         // row that the Watchdog would revive the tracker on.
         app.appScope.launch {
-            // No settings row seen from the server yet: there is nothing to patch, and an
-            // upsert here could wipe a schedule the Remote phone set.
+            // Audit C1: a dropped patch used to leave the server row armed after a
+            // local master OFF, so the next Remote settings edit re-armed the
+            // tracker. Record the value first: when the PATCH cannot run yet (no
+            // settings row seen) or fails, it stays pending in Prefs and the next
+            // syncSettings poll or Watchdog tick retries it instead of losing it.
+            if (guardArmed != null) p.pendingGuardArmed = guardArmed
+            // No settings row seen from the server yet: a filtered PATCH on a
+            // missing row is a silent no-op, so there is nothing to patch — the
+            // value stays pending until syncSettings has fetched a row.
             if (lastSettingsSeenMs == 0L) {
                 runCatching { app.api.markSettingsApplied(p.deviceId) }
                 return@launch
             }
-            try {
-                app.api.patchTrackerSettings(p.deviceId, guardArmed, speedLimitKmh)
-            } catch (e: IOException) { /* retried on the next settings poll */ }
+            val ok = app.api.patchTrackerSettings(p.deviceId, guardArmed, speedLimitKmh)
+            // Clear only when this PATCH carried the pending value: a
+            // speed-limit-only call must never drop a pending guard_armed, and a
+            // newer arm/disarm queued meanwhile must survive an older PATCH.
+            if (ok && guardArmed != null && p.pendingGuardArmed == guardArmed) p.pendingGuardArmed = null
+            else if (!ok && guardArmed != null) AppLog.i("guard", "guard patch pending")
         }
     }
 
@@ -689,7 +739,7 @@ class TrackingService : Service() {
         val inside = if (start < end) hour in start until end else hour >= start || hour < end
         // After a manual disarm the guard stays off for 10 minutes, even inside the window.
         val latched = System.currentTimeMillis() - p.manualDisarmAtMs < DISARM_LATCH_MS
-        if (inside && !p.parkingArmed && !latched) { GuardControl.setArmed(this, true); p.scheduleArmed = true; pushSettingsToServer(guardArmed = true) }
+        if (inside && p.masterOn && !p.parkingArmed && !latched) { GuardControl.setArmed(this, true); p.scheduleArmed = true; pushSettingsToServer(guardArmed = true) }
         else if (!inside && p.scheduleArmed) { GuardControl.setArmed(this, false, latch = false); p.scheduleArmed = false; pushSettingsToServer(guardArmed = false) }
     }
 
@@ -774,6 +824,9 @@ class TrackingService : Service() {
         const val SEED_RETRY_MS = 60_000L
         /** A remote command stays executable this long after it was sent. */
         const val FRESH_COMMAND_MS = 10 * 60_000L
+        /** After a locate command, the service stays alive this long for the
+         * one-shot fix to land before the master-off stop runs (C3). */
+        const val LOCATE_GRACE_MS = 30_000L
         /**
          * Start/arm commands stay executable longer: the Watchdog only runs every 15 minutes,
          * so a 10-minute window could expire before it ever gets a chance to revive a stopped

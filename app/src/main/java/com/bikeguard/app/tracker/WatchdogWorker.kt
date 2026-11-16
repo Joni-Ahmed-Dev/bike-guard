@@ -23,6 +23,10 @@ class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         // backstop that finishes a pending SOS.
         SosController.resumePending(app)
         app.sync.flush()
+        // Audit C1: a local master OFF while offline leaves guard_armed pending in
+        // Prefs, and the service may be stopped, so flush it here too — the
+        // Watchdog runs even then. The helper no-ops when nothing is pending.
+        if (app.prefs.isTracker) GuardControl.flushPendingGuardArmed(app)
         // Heartbeat to the diagnostics Worker, so the owner can see the tracker
         // is alive even when Supabase sync is failing.
         app.diag.report("heartbeat")
@@ -33,13 +37,21 @@ class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         if (app.prefs.isLoggedIn) checkNewEvents(app)
         // A stopped tracker never polls Remote commands or settings, so a Remote arm or
         // tracking_start would otherwise never arrive (audit #1). Revive it from the server:
-        // a fresh start/arm command, or a guardArmed settings row.
+        // a fresh master_on command, or, when the local master switch is ON, a fresh
+        // start/arm command or a guardArmed settings row. The local masterOn gate
+        // (C4) matters when master_off ran while offline: both server writes failed,
+        // so the server still says armed and tracking expected, and only the local
+        // switch knows tracking was turned off.
         if (app.prefs.isTracker && app.prefs.isLoggedIn && !TrackerState.running.value && Perms.hasFine(app)) {
             val revive = runCatching {
                 val cmds = app.api.pendingCommands(app.prefs.deviceId).orEmpty()
-                val freshStart = cmds.any { c ->
-                    (c.type == "tracking_start" || c.type == "arm" || c.type == "master_on") &&
+                val freshMasterOn = cmds.any { c ->
+                    c.type == "master_on" &&
                         // Server-computed age (v1.2.8): a wrong phone clock cannot expire it.
+                        c.ageMs < TrackingService.freshWindowMs(c.type)
+                }
+                val freshStartOrArm = cmds.any { c ->
+                    (c.type == "tracking_start" || c.type == "arm") &&
                         c.ageMs < TrackingService.freshWindowMs(c.type)
                 }
                 // A stale guardArmed row must never revive a tracker whose master
@@ -48,7 +60,10 @@ class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 // agree. Unknown (null) keeps the old behaviour.
                 val guardArmed = runCatching { app.api.getDeviceSettings(app.prefs.deviceId)?.guardArmed }.getOrNull() == true &&
                     runCatching { app.api.trackingExpected(app.prefs.deviceId) }.getOrNull() != false
-                freshStart || guardArmed
+                // A fresh master_on revives even when local masterOn is still false:
+                // that is the Remote turning tracking back on. Everything else
+                // needs the local master switch ON.
+                freshMasterOn || (app.prefs.masterOn && (freshStartOrArm || guardArmed))
             }.getOrNull() == true
             if (revive && !app.tryStartTracking()) notifyResume(app)
             AppLog.i("watchdog", "revive=" + revive + " running=" + TrackerState.running.value)
